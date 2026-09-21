@@ -1,9 +1,3 @@
-export interface TBaseResponse<T> {
-	success: boolean;
-	message: string;
-	data: T;
-}
-
 /**
  * @description Search options dùng chung cho các response có phân trang/filter.
  */

@@ -15,7 +15,7 @@ import { DashboardUserMenu } from "./dashboard-user-menu";
 export const DashboardMobileHeader = () => (
 	<nav className="flex h-12 w-full shrink-0 items-center gap-2 overflow-x-auto border-b bg-sidebar pr-3 pl-2 md:hidden">
 		<Link to="/" aria-label="Home" className="flex shrink-0 items-center">
-			<AppLogo size="sm" hideTitle />
+			<AppLogo hideTitle />
 		</Link>
 		<div className="min-w-0 flex-1">
 			<DashboardBreadcrumb />

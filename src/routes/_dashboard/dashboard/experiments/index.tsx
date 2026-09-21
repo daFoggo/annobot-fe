@@ -22,7 +22,8 @@ const ExperimentsPage = () => {
 };
 
 export const Route = createFileRoute("/_dashboard/dashboard/experiments/")({
-	loader: ({ context }) =>
-		context.queryClient.ensureQueryData(experimentListQueryOptions()),
+	loader: async ({ context }) => {
+		await context.queryClient.query(experimentListQueryOptions());
+	},
 	component: ExperimentsPage,
 });

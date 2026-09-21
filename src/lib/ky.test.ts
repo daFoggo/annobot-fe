@@ -38,14 +38,12 @@ describe("ky api instance", () => {
 
 	it("attaches Bearer token from auth-token before sending", async () => {
 		mockGetAuthTokenForRequest.mockResolvedValue("token-abc");
-		mockFetch.mockResolvedValue(
-			jsonResponse({ success: true, message: "OK", data: { id: "u1" } }),
-		);
+		mockFetch.mockResolvedValue(jsonResponse({ id: "u1" }));
 
 		const api = await importApi();
-		const body = await api.get("users/me").json<{ data: { id: string } }>();
+		const body = await api.get("users/me").json<{ id: string }>();
 
-		expect(body.data).toEqual({ id: "u1" });
+		expect(body).toEqual({ id: "u1" });
 		const [request] = mockFetch.mock.calls[0] as [Request];
 		expect(request.url).toContain("/users/me");
 		expect(request.headers.get("Authorization")).toBe("Bearer token-abc");
@@ -56,14 +54,12 @@ describe("ky api instance", () => {
 		mockRefreshAuthToken.mockResolvedValue("token-fresh");
 		mockFetch
 			.mockResolvedValueOnce(jsonResponse({ detail: "Invalid token" }, 401))
-			.mockResolvedValueOnce(
-				jsonResponse({ success: true, message: "OK", data: { id: "u1" } }),
-			);
+			.mockResolvedValueOnce(jsonResponse({ id: "u1" }));
 
 		const api = await importApi();
-		const body = await api.get("users/me").json<{ data: { id: string } }>();
+		const body = await api.get("users/me").json<{ id: string }>();
 
-		expect(body.data).toEqual({ id: "u1" });
+		expect(body).toEqual({ id: "u1" });
 		expect(mockRefreshAuthToken).toHaveBeenCalled();
 		expect(mockFetch).toHaveBeenCalledTimes(2);
 		// retry request carries the fresh token + retry header
@@ -113,7 +109,7 @@ describe("ky api instance", () => {
 	it("extracts backend error message from message field (non-401)", async () => {
 		mockFetch.mockResolvedValue(
 			jsonResponse(
-				{ success: false, message: "Invalid credentials", data: null },
+				{ status: 400, title: "Bad Request", detail: "Invalid credentials" },
 				400,
 			),
 		);

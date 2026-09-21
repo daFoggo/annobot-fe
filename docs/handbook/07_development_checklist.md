@@ -81,7 +81,7 @@ Supabase:
 AnnoBot backend (ky):
 
 - Use the shared `api` instance from `src/lib/ky.ts`; no hand-rolled `fetch`.
-- `server.ts` unwraps `ResponseSchema<T>` → `response.data`.
+- `server.ts` types the response as the resource directly (no envelope unwrap); errors are RFC 7807 problem details.
 - Do not reimplement Bearer/refresh auth — ky handles it via the session cookie.
 
 Both:

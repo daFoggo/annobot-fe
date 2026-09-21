@@ -57,7 +57,7 @@ The app has two supported data sources. Both follow the **same** feature shape: 
 |---|---|---|
 | Client | `@supabase/supabase-js` — shared instance in `src/utils/supabase.ts` | `ky` — shared instance `api` in `src/lib/ky.ts` |
 | IO location | feature `server.ts` (server-only) | feature `server.ts` (server-only, imports `@tanstack/react-start/server-only`) |
-| Response shape | Supabase `{ data, error }` — check `error`, translate `PGRST116` → `notFound()` | `ResponseSchema<T>` (`{ success, message, data }`) — unwrap `response.data` |
+| Response shape | Supabase `{ data, error }` — check `error`, translate `PGRST116` → `notFound()` | Resource representation trực tiếp; errors là RFC 7807 problem details |
 | Auth | server-side session (e.g. `supabase.auth`) | Bearer token tự động gắn bởi ky (server session cookie), 401 → refresh → retry |
 | Error handling | `getErrorMessage(error, fallback)` | `getErrorMessage(error, fallback)` |
 
@@ -83,14 +83,9 @@ Example (ky, feature `server.ts`):
 ```ts
 import "@tanstack/react-start/server-only";
 import { api } from "@/lib/ky";
-import type { TBaseResponse } from "@/types/api";
 
-export const getExperiment = async (id: string) => {
-	const response = await api
-		.get(`experiments/${id}`)
-		.json<TBaseResponse<Experiment>>();
-	return response.data;
-};
+export const getExperiment = async (id: string) =>
+	api.get(`experiments/${id}`).json<Experiment>();
 ```
 
 Both are then wrapped in `functions.ts` (`createServerFn` + validator) and exposed through `queries.ts` (`queryOptions` + mutation hooks). See `04_tanstack_start_query_router.md` → "Two Data Source Patterns" for the full playbook.

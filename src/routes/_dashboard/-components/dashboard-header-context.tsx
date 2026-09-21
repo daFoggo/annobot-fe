@@ -11,7 +11,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	CreateExperimentDialog,
-	ExperimentIcon,
 	experimentListQueryOptions,
 } from "@/features/experiments";
 
@@ -52,7 +51,6 @@ export const DashboardHeaderContext = () => {
 	const options = (experiments ?? []).map((experiment) => ({
 		value: experiment.id,
 		label: experiment.title,
-		icon: ExperimentIcon,
 	}));
 
 	return (

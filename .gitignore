@@ -16,3 +16,6 @@ todos.json
 
 # ad-hoc scripts
 scripts/local/
+
+# logs
+*.log

@@ -412,14 +412,9 @@ The FastAPI backend (`anno-bot-merge`, base `http://localhost:40723`, prefix `/a
 // src/features/[feature]/server.ts
 import "@tanstack/react-start/server-only";
 import { api } from "@/lib/ky";
-import type { TBaseResponse } from "@/types/api";
 
-export const getExperiment = async (id: string) => {
-	const response = await api
-		.get(`experiments/${id}`)
-		.json<TBaseResponse<Experiment>>();
-	return response.data;
-};
+export const getExperiment = async (id: string) =>
+	api.get(`experiments/${id}`).json<Experiment>();
 ```
 
 ```ts
@@ -433,7 +428,7 @@ export const getExperimentFn = createServerFn({ method: "GET" })
 
 Rules:
 
-- The backend wraps every response in `ResponseSchema<T>` (`{ success, message, data }`); `server.ts` must unwrap `response.data`.
+- The backend returns resource representations directly (no `{ success, message, data }` envelope); `server.ts` types the response as the resource itself. Errors are RFC 7807 problem details (`{ type, title, status, detail }`).
 - `ky` automatically attaches the Bearer token (from the server session cookie via `src/lib/auth-token.ts`), retries once on 401 after refreshing, and redirects to sign-in when refresh fails — do not reimplement auth on each call.
 - Check the exact endpoint contract in the backend OpenAPI (`http://localhost:40723/openapi.json`) before writing a `server.ts` call.
 - Feature auth is session-cookie based (`src/lib/session.server.ts`); `sign-in`/`sign-up`/`refresh` server functions update or clear that session.

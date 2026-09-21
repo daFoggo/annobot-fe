@@ -1,4 +1,4 @@
-import { IconHomeSpark } from "@tabler/icons-react";
+import { IconDevicesSearch } from "@tabler/icons-react";
 import { SITE_CONFIG } from "@/configs/site";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +21,11 @@ export const AppLogo = ({
 			? "text-sm font-semibold"
 			: size === "sm"
 				? "text-base"
-				: "text-2xl";
+				: "text-xl";
 
 	return (
 		<div className={cn("flex items-center gap-2 font-logo", className)}>
-			{!hideIcon && <IconHomeSpark className={iconSize} />}
+			{!hideIcon && <IconDevicesSearch className={iconSize} />}
 			{!hideTitle && (
 				<span className={cn("font-semibold", titleSize)}>
 					{SITE_CONFIG.app.title}

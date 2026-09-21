@@ -13,9 +13,10 @@ export const Route = createFileRoute(
 	staticData: {
 		sidebarNav: ExperimentSidebarNav,
 	},
-	loader: ({ context, params }) =>
-		context.queryClient.ensureQueryData(
+	loader: async ({ context, params }) => {
+		await context.queryClient.query(
 			experimentDetailQueryOptions(params.experimentId),
-		),
+		);
+	},
 	component: () => <Outlet />,
 });

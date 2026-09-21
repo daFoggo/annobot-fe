@@ -55,8 +55,8 @@ src/features/[feature]/
 - TanStack Query, Router, and Start are the approved stack for server state, routing, and server functions.
 - Query functions must resolve valid data or throw. Do not return `null`, `[]`, or fallback objects for failures.
 - Use `queryOptions` factories and feature query key factories.
-- Critical route data: `loader` + `context.queryClient.ensureQueryData(...)` + `useSuspenseQuery`.
-- Secondary/optional widgets: `prefetchQuery` or local `useQuery`, with local loading/error/empty states.
+- Critical route data: `loader` + awaited `context.queryClient.query(...)` + `useSuspenseQuery`. Do not use deprecated `ensureQueryData`/`prefetchQuery`.
+- Secondary/optional widgets: fire-and-forget `void context.queryClient.query(...).catch(noop)` or local `useQuery`, with local loading/error/empty states.
 - Required Suspense query options should not use `enabled`; optional/inline component queries may use `enabled`.
 - Shared mutation hooks own cache invalidation, optimistic updates, and cache writes.
 - Components own toast, dialog state, navigation, and local UI side effects.
@@ -79,7 +79,7 @@ The AnnoBot FastAPI backend (`anno-bot-merge`) is the primary data source. It is
 
 - All HTTP IO lives in the feature's `server.ts` (server-only, imports `@tanstack/react-start/server-only`) and uses the `api` instance from `@/lib/ky`.
 - `functions.ts` wraps each `server.ts` call in a `createServerFn` with `.validator(...)`; `queries.ts` consumes those server functions.
-- The backend wraps every response in `ResponseSchema<T>` (`{ success, message, data }`); `server.ts` must unwrap `response.data`.
+- The backend returns resource representations directly (no `{ success, message, data }` envelope); `server.ts` types the response as the resource itself. Errors are RFC 7807 problem details (`{ type, title, status, detail }`).
 - `ky` automatically attaches the Bearer token (from the server session cookie), retries once on 401, and redirects to sign-in when refresh fails — do not reimplement auth on each call.
 - Check the exact endpoint contract in the backend OpenAPI (`http://localhost:40723/openapi.json`) before writing a `server.ts` call.
 

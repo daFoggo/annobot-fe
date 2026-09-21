@@ -1,4 +1,9 @@
-import { IconCheck, IconSearch, IconSelector } from "@tabler/icons-react";
+import {
+	IconCheck,
+	IconLayoutGrid,
+	IconSearch,
+	IconSelector,
+} from "@tabler/icons-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -14,14 +19,11 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { DashboardIcon } from "../types";
 
 export interface DashboardContextOption {
 	value: string;
 	label: string;
 	description?: string;
-	/** Icon hiển thị trước label (dùng chung với breadcrumb...). */
-	icon?: DashboardIcon;
 }
 
 /**
@@ -89,7 +91,6 @@ export const DashboardContextSwitcher = ({
 	const [query, setQuery] = useState("");
 	const [open, setOpen] = useState(false);
 	const selected = options.find((option) => option.value === value);
-	const SelectedIcon = selected?.icon;
 	const filtered = query
 		? options.filter((option) =>
 				option.label.toLowerCase().includes(query.toLowerCase()),
@@ -108,9 +109,7 @@ export const DashboardContextSwitcher = ({
 				<PopoverTrigger
 					render={
 						<Button variant="ghost" size="sm" aria-label={label}>
-							{SelectedIcon ? (
-								<SelectedIcon className="size-4 shrink-0 text-muted-foreground" />
-							) : null}
+							<IconLayoutGrid className="size-4 text-muted-foreground" />
 							<span className="max-w-32 truncate">
 								{selected?.label ?? value}
 							</span>
@@ -153,9 +152,6 @@ export const DashboardContextSwitcher = ({
 										option.value === value && "bg-accent/60",
 									)}
 								>
-									{option.icon ? (
-										<option.icon className="size-4 shrink-0 text-muted-foreground" />
-									) : null}
 									<span className="min-w-0 flex-1 truncate">
 										{option.label}
 									</span>
