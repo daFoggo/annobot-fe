@@ -1,0 +1,15 @@
+{
+	"editor.codeActionsOnSave": {
+		"source.organizeImports.biome": "explicit",
+		"source.fixAll.biome": "explicit"
+	},
+	"editor.quickSuggestions": {
+		"other": "on",
+		"comments": "on",
+		"strings": "on"
+	},
+	"files.associations": {
+		"*.css": "tailwindcss"
+	},
+	"tailwindCSS.experimental.configFile": "src/styles.css"
+}

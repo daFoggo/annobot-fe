@@ -1,0 +1,3 @@
+# Chuẩn hoá line ending về LF cho mọi file text (Prettier/Biome đều cấu hình LF).
+# Ghi đè core.autocrlf của từng máy để checkout luôn ra LF.
+* text=auto eol=lf
