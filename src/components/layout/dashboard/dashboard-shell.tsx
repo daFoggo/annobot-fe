@@ -3,7 +3,11 @@ import type { PropsWithChildren, ReactNode } from "react";
 import { useCallback, useEffect, useRef } from "react";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { useDashboardNavGroups, useDashboardSidebarNav } from "./dashboard-nav";
+import {
+	useDashboardNavGroups,
+	useDashboardNavKey,
+	useDashboardSidebarNav,
+} from "./dashboard-nav";
 import {
 	DashboardShellProvider,
 	useDashboardShell,
@@ -86,6 +90,7 @@ export interface DashboardShellSidebarProps {
 const DashboardShellSidebar = ({ className }: DashboardShellSidebarProps) => {
 	const groups = useDashboardNavGroups();
 	const SidebarNav = useDashboardSidebarNav();
+	const navKey = useDashboardNavKey();
 	const { state } = useDashboardShell();
 	const hasNav = state.hasNav;
 	const { setOpen } = useSidebar();
@@ -109,7 +114,14 @@ const DashboardShellSidebar = ({ className }: DashboardShellSidebarProps) => {
 			collapsible={hasNav ? "icon" : "offcanvas"}
 			className={className}
 		>
-			{SidebarNav ? <SidebarNav /> : <DashboardSidebarNav groups={groups} />}
+			{/* key = route cấp nav → đổi menu (vd vào/ra experiment) thì remount và
+			    animate enter; điều hướng trong cùng menu thì không animate. */}
+			<div
+				key={navKey}
+				className="flex min-h-0 flex-1 flex-col animate-in fade-in-0 slide-in-from-left-2 duration-200 ease-out motion-reduce:animate-none"
+			>
+				{SidebarNav ? <SidebarNav /> : <DashboardSidebarNav groups={groups} />}
+			</div>
 		</DashboardSidebar>
 	);
 };

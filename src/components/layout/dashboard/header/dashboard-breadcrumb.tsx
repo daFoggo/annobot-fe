@@ -78,7 +78,7 @@ export const DashboardBreadcrumb = ({ children }: DashboardBreadcrumbProps) => {
 
 							return (
 								<Fragment key={`${to ?? "leaf"}-${item.label}`}>
-									<BreadcrumbItem className="flex min-w-0 items-center gap-1.5">
+									<BreadcrumbItem className="flex min-w-0 items-center gap-1.5 animate-in fade-in-0 slide-in-from-right-1 duration-200 ease-out motion-reduce:animate-none">
 										{Icon ? (
 											<Icon className="size-3.5 shrink-0 text-muted-foreground" />
 										) : null}

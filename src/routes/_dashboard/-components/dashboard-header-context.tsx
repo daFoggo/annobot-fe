@@ -1,4 +1,4 @@
-import { IconLayoutGrid, IconPlus } from "@tabler/icons-react";
+import { IconFlask, IconPlus } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useMatch, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
@@ -38,7 +38,14 @@ export const DashboardHeaderContext = () => {
 	// Chỉ hiện switcher khi đang ở trong một experiment (trang danh sách tự chọn).
 	if (!experimentId) return null;
 
-	if (isPending) return <Skeleton className="h-7 w-32" />;
+	if (isPending) {
+		return (
+			<>
+				<DashboardHeaderDivider className="pl-2" />
+				<Skeleton className="h-7 w-32" />
+			</>
+		);
+	}
 
 	if (isError) {
 		return (
@@ -71,7 +78,7 @@ export const DashboardHeaderContext = () => {
 				footer={
 					<>
 						<DashboardContextSwitcherItem
-							icon={<IconLayoutGrid />}
+							icon={<IconFlask />}
 							onSelect={() => navigate({ to: "/dashboard/experiments" })}
 						>
 							All experiments

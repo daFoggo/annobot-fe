@@ -1,6 +1,6 @@
 import {
 	IconDevicesBolt,
-	IconLayoutGrid,
+	IconFlask,
 	IconLayoutList,
 	IconPlus,
 	IconSearch,
@@ -191,7 +191,7 @@ const ExperimentsPage = () => {
 						>
 							<TabsList>
 								<TabsTrigger value="grid" aria-label="Grid view">
-									<IconLayoutGrid data-icon />
+									<IconFlask data-icon />
 								</TabsTrigger>
 								<TabsTrigger value="list" aria-label="List view">
 									<IconLayoutList data-icon />

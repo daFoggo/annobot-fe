@@ -1,6 +1,6 @@
 import {
 	IconCheck,
-	IconLayoutGrid,
+	IconFlask,
 	IconSearch,
 	IconSelector,
 } from "@tabler/icons-react";
@@ -109,7 +109,7 @@ export const DashboardContextSwitcher = ({
 				<PopoverTrigger
 					render={
 						<Button variant="ghost" size="sm" aria-label={label}>
-							<IconLayoutGrid className="size-4 text-muted-foreground" />
+							<IconFlask className="size-4 text-muted-foreground" />
 							<span className="max-w-32 truncate">
 								{selected?.label ?? value}
 							</span>

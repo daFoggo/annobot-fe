@@ -49,3 +49,22 @@ export const useDashboardSidebarNav = ():
 			return undefined;
 		},
 	});
+
+/**
+ * Id của route cấp nav hiện tại cho sidebar cấp 1 (route khai báo
+ * `staticData.navItems` hoặc `staticData.sidebarNav`). Dùng làm key để animate
+ * khi sidebar chuyển sang một menu khác — chỉ thay đổi khi menu thực sự đổi,
+ * điều hướng trong cùng section thì key giữ nguyên.
+ */
+export const useDashboardNavKey = (): string =>
+	useMatches({
+		select: (matches) => {
+			for (let index = matches.length - 1; index >= 0; index -= 1) {
+				const match = matches[index];
+				if (match.staticData.sidebarNav || match.staticData.navItems) {
+					return match.routeId;
+				}
+			}
+			return "none";
+		},
+	});
