@@ -1,4 +1,4 @@
-import { IconChartBar, IconSettings } from "@tabler/icons-react";
+import { IconChartBar, IconHelp, IconSettings } from "@tabler/icons-react";
 import { Link, useMatch } from "@tanstack/react-router";
 import { usePathname } from "@/components/layout/dashboard";
 import {
@@ -38,6 +38,21 @@ export const ExperimentSidebarNav = () => {
 					>
 						<IconChartBar />
 						<span>Overview</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						render={
+							<Link
+								to="/dashboard/experiments/$experimentId/inquiries"
+								params={{ experimentId }}
+							/>
+						}
+						isActive={pathname === `${overviewPath}/inquiries`}
+						tooltip="Inquiries"
+					>
+						<IconHelp />
+						<span>Inquiries</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				<SidebarMenuItem>

@@ -1,5 +1,4 @@
 import {
-	IconChartAreaLine,
 	IconChartHistogram,
 	IconChartLine,
 	IconRotate,
@@ -18,7 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
-	CardAction,
 	CardContent,
 	CardDescription,
 	CardHeader,
@@ -30,21 +28,27 @@ import {
 	ChartTooltip,
 	ChartTooltipContent,
 } from "@/components/ui/chart";
-import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from "@/components/ui/empty";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { EnergyChart } from "@/features/dashboard";
+import type {
+	EnergyChart,
+	ResourceConsumptionType,
+} from "@/features/dashboard";
+
 import { cn } from "@/lib/utils";
 
 /** Number of hue tokens available in `styles.css` (`--chart-1..10`). */
@@ -99,20 +103,29 @@ const bucketLabel = (bucket: string) =>
 		"1 hour": "hourly averages",
 	})[bucket] ?? `${bucket} averages`;
 
+const CONSUMPTION_TYPES = [
+	{ value: "power", label: "Power consumption" },
+	{ value: "water", label: "Water consumption" },
+];
+
 export interface EnergyUsageChartProps {
 	data: EnergyChart;
+	resourceType?: ResourceConsumptionType;
+	onResourceTypeChange?: (type: ResourceConsumptionType) => void;
 	className?: string;
 	/** Effective IANA zone used to format axis/tooltip/header labels. */
 	timezone?: string;
 }
 
 /**
- * House power chart: stacked total by default, overlay to compare device
+ * House power/water chart: stacked total by default, overlay to compare device
  * duty cycles. Legend toggles series, the brush zooms the window, and the
  * three stat tiles recompute from the visible + zoomed slice.
  */
 export const EnergyUsageChart = ({
 	data,
+	resourceType = "power",
+	onResourceTypeChange,
 	className,
 	timezone,
 }: EnergyUsageChartProps) => {
@@ -123,6 +136,10 @@ export const EnergyUsageChart = ({
 		startIndex: number;
 		endIndex: number;
 	}>();
+
+	const isWater = resourceType === "water";
+	const effectiveUnit = data.unit || (isWater ? "L/min" : "W");
+	const resourceTitle = isWater ? "Water consumption" : "Power consumption";
 
 	const series = useMemo(
 		() => data.series.map((item, index) => ({ ...item, key: `s${index}` })),
@@ -157,33 +174,70 @@ export const EnergyUsageChart = ({
 		return next;
 	}, [series]);
 
-	if (series.length === 0 || data.timestamps.length === 0) {
-		return (
-			<Card className={cn("h-full", className)}>
-				<CardHeader>
-					<CardTitle>Power consumption</CardTitle>
-					<CardDescription>
-						Live power draw per device, from the resampled sensor stream.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="flex flex-1 items-center">
-					<Empty className="border">
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<IconChartAreaLine />
-							</EmptyMedia>
-							<EmptyTitle>No power data yet</EmptyTitle>
-							<EmptyDescription>
-								Power meters will show up here once the collector has recorded
-								activity.
-							</EmptyDescription>
-						</EmptyHeader>
-					</Empty>
-				</CardContent>
-			</Card>
-		);
-	}
+	const headerNode = (
+		<CardHeader className="pb-2">
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<div>
+					{onResourceTypeChange ? (
+						<Select
+							items={CONSUMPTION_TYPES}
+							value={resourceType}
+							onValueChange={(val) => {
+								if (val === "power" || val === "water") {
+									onResourceTypeChange(val);
+								}
+							}}
+						>
+							<SelectTrigger className="h-auto w-fit border-none bg-transparent p-0 pr-1 gap-1 text-base sm:text-lg font-semibold tracking-tight text-foreground shadow-none ring-0 outline-none hover:bg-transparent focus:ring-0 focus-visible:ring-0 focus-visible:border-none focus-visible:outline-none dark:bg-transparent dark:hover:bg-transparent cursor-pointer [&_svg]:size-4 [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent align="start" className="min-w-44">
+								<SelectGroup>
+									{CONSUMPTION_TYPES.map((t) => (
+										<SelectItem key={t.value} value={t.value}>
+											{t.label}
+										</SelectItem>
+									))}
+								</SelectGroup>
+							</SelectContent>
+						</Select>
+					) : (
+						<CardTitle className="text-base font-semibold sm:text-lg">
+							{resourceTitle}
+						</CardTitle>
+					)}
+				</div>
 
+				<Tabs
+					value={mode}
+					onValueChange={(value) => {
+						if (value === "stack" || value === "overlay") {
+							setMode(value);
+						}
+					}}
+				>
+					<TabsList className="h-8">
+						<TabsTrigger value="stack" className="gap-1.5 text-xs">
+							<IconChartHistogram
+								data-icon="inline-start"
+								className="size-3.5"
+							/>
+							Stacked
+						</TabsTrigger>
+						<TabsTrigger value="overlay" className="gap-1.5 text-xs">
+							<IconChartLine data-icon="inline-start" className="size-3.5" />
+							Overlay
+						</TabsTrigger>
+					</TabsList>
+				</Tabs>
+			</div>
+			<CardDescription className="font-mono text-xs">
+				Last {windowLabel(data.since, data.until)} · {bucketLabel(data.bucket)}
+			</CardDescription>
+		</CardHeader>
+	);
+
+	const hasSeries = series.length > 0 && data.timestamps.length > 0;
 	const start = range?.startIndex ?? 0;
 	const end = range?.endIndex ?? data.timestamps.length - 1;
 	const visible = series.filter((item) => !hidden.has(item.key));
@@ -218,37 +272,7 @@ export const EnergyUsageChart = ({
 				className,
 			)}
 		>
-			<CardHeader className="pb-2">
-				<CardTitle>Power consumption</CardTitle>
-				<CardDescription className="font-mono text-xs">
-					Last {windowLabel(data.since, data.until)} ·{" "}
-					{bucketLabel(data.bucket)}
-				</CardDescription>
-				<CardAction>
-					<Tabs
-						value={mode}
-						onValueChange={(value) => {
-							if (value === "stack" || value === "overlay") {
-								setMode(value);
-							}
-						}}
-					>
-						<TabsList className="h-8">
-							<TabsTrigger value="stack" className="gap-1.5 text-xs">
-								<IconChartHistogram
-									data-icon="inline-start"
-									className="size-3.5"
-								/>
-								Stacked
-							</TabsTrigger>
-							<TabsTrigger value="overlay" className="gap-1.5 text-xs">
-								<IconChartLine data-icon="inline-start" className="size-3.5" />
-								Overlay
-							</TabsTrigger>
-						</TabsList>
-					</Tabs>
-				</CardAction>
-			</CardHeader>
+			{headerNode}
 
 			<CardContent className="flex flex-1 flex-col gap-4 overflow-visible">
 				<div className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-muted/20 p-2.5">
@@ -257,7 +281,7 @@ export const EnergyUsageChart = ({
 							Current
 						</span>
 						<span className="font-mono text-sm font-semibold text-foreground tabular-nums">
-							{formatWatts(stats.currentW)}
+							{hasSeries ? formatUnit(stats.current, effectiveUnit) : "—"}
 						</span>
 					</div>
 					<div className="flex flex-col gap-0.5 px-3">
@@ -265,7 +289,7 @@ export const EnergyUsageChart = ({
 							Peak
 						</span>
 						<span className="font-mono text-sm font-semibold text-foreground tabular-nums">
-							{formatWatts(stats.peakW)}
+							{hasSeries ? formatUnit(stats.peak, effectiveUnit) : "—"}
 						</span>
 					</div>
 					<div className="flex min-w-0 flex-col gap-0.5 px-3">
@@ -274,92 +298,111 @@ export const EnergyUsageChart = ({
 						</span>
 						<span
 							className="truncate font-mono text-sm font-semibold text-foreground tabular-nums"
-							title={stats.topName}
+							title={hasSeries ? stats.topName : undefined}
 						>
-							{stats.topName}
+							{hasSeries ? stats.topName : "—"}
 						</span>
 					</div>
 				</div>
 
-				<ChartContainer config={config} className="aspect-auto h-80 w-full">
-					<ComposedChart
-						accessibilityLayer
-						data={rows}
-						margin={{ top: 20, right: 16, bottom: 4, left: 4 }}
-					>
-						<CartesianGrid vertical={false} />
-						<XAxis
-							dataKey="ts"
-							tickLine={false}
-							axisLine={false}
-							tickMargin={8}
-							minTickGap={48}
-							interval="preserveStartEnd"
-							tickFormatter={(value) => timeLabel(String(value), zone)}
-						/>
-						<YAxis
-							tickLine={false}
-							axisLine={false}
-							width={56}
-							tickFormatter={(value: number) =>
-								value === 0 ? "" : `${value} W`
+				<div className="relative aspect-auto h-80 w-full">
+					<ChartContainer config={config} className="h-full w-full">
+						<ComposedChart
+							accessibilityLayer
+							data={
+								rows.length > 0
+									? rows
+									: [{ ts: data.since }, { ts: data.until }]
 							}
-						/>
-						<ChartTooltip
-							offset={32}
-							content={
-								<ChartTooltipContent
-									indicator="line"
-									className="max-h-64 overflow-y-auto"
-									labelFormatter={(value) => timeLabel(String(value), zone)}
-								/>
-							}
-						/>
-						{series.map((item, index) =>
-							mode === "stack" ? (
-								<Area
-									key={item.key}
-									dataKey={item.key}
-									stackId="total"
-									type="stepAfter"
-									stroke={colorFor(index)}
-									strokeWidth={1}
-									fill={colorFor(index)}
-									fillOpacity={0.45}
-									hide={hidden.has(item.key)}
-								/>
-							) : (
-								<Line
-									key={item.key}
-									dataKey={item.key}
-									type="stepAfter"
-									stroke={colorFor(index)}
-									strokeWidth={1.5}
-									dot={false}
-									hide={hidden.has(item.key)}
-								/>
-							),
-						)}
-						<Brush
-							dataKey="ts"
-							height={24}
-							travellerWidth={8}
-							fill="var(--muted)"
-							stroke="var(--border)"
-							onChange={(next) => {
-								if (
-									typeof next?.startIndex === "number" &&
-									typeof next?.endIndex === "number"
-								) {
-									setRange({
-										startIndex: next.startIndex,
-										endIndex: next.endIndex,
-									});
+							margin={{ top: 20, right: 16, bottom: 4, left: 4 }}
+						>
+							<CartesianGrid vertical={false} />
+							<XAxis
+								dataKey="ts"
+								tickLine={false}
+								axisLine={false}
+								tickMargin={8}
+								minTickGap={48}
+								interval="preserveStartEnd"
+								tickFormatter={(value) => timeLabel(String(value), zone)}
+							/>
+							<YAxis
+								tickLine={false}
+								axisLine={false}
+								width={56}
+								tickFormatter={(value: number) =>
+									value === 0 ? "" : `${value} ${effectiveUnit}`
 								}
-							}}
-						/>
-					</ComposedChart>
-				</ChartContainer>
+							/>
+							{hasSeries ? (
+								<ChartTooltip
+									offset={32}
+									content={
+										<ChartTooltipContent
+											indicator="line"
+											className="max-h-64 overflow-y-auto"
+											labelFormatter={(value) => timeLabel(String(value), zone)}
+										/>
+									}
+								/>
+							) : null}
+							{hasSeries
+								? series.map((item, index) =>
+										mode === "stack" ? (
+											<Area
+												key={item.key}
+												dataKey={item.key}
+												stackId="total"
+												type="stepAfter"
+												stroke={colorFor(index)}
+												strokeWidth={1}
+												fill={colorFor(index)}
+												fillOpacity={0.45}
+												hide={hidden.has(item.key)}
+											/>
+										) : (
+											<Line
+												key={item.key}
+												dataKey={item.key}
+												type="stepAfter"
+												stroke={colorFor(index)}
+												strokeWidth={1.5}
+												dot={false}
+												hide={hidden.has(item.key)}
+											/>
+										),
+									)
+								: null}
+							{hasSeries ? (
+								<Brush
+									dataKey="ts"
+									height={24}
+									travellerWidth={8}
+									fill="var(--muted)"
+									stroke="var(--border)"
+									onChange={(next) => {
+										if (
+											typeof next?.startIndex === "number" &&
+											typeof next?.endIndex === "number"
+										) {
+											setRange({
+												startIndex: next.startIndex,
+												endIndex: next.endIndex,
+											});
+										}
+									}}
+								/>
+							) : null}
+						</ComposedChart>
+					</ChartContainer>
+					{!hasSeries ? (
+						<div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
+							<span className="text-xs font-medium text-muted-foreground/60">
+								{isWater ? "No water flow data available" : "No power data yet"}
+							</span>
+						</div>
+					) : null}
+				</div>
 
 				<div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/10 p-2.5">
 					<div className="flex items-center justify-between gap-2">
@@ -371,7 +414,9 @@ export const EnergyUsageChart = ({
 								variant="outline"
 								className="h-4.5 px-1.5 font-mono text-[10px]"
 							>
-								{visible.length}/{series.length} active
+								{hasSeries
+									? `${visible.length}/${series.length} active`
+									: "0/0 active"}
 							</Badge>
 						</div>
 						<div className="flex items-center gap-1">
@@ -380,6 +425,7 @@ export const EnergyUsageChart = ({
 								variant="ghost"
 								size="sm"
 								onClick={selectAll}
+								disabled={!hasSeries}
 								className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
 							>
 								All
@@ -393,6 +439,7 @@ export const EnergyUsageChart = ({
 											variant="ghost"
 											size="sm"
 											onClick={reset}
+											disabled={!hasSeries}
 											className="size-6 p-0 text-muted-foreground hover:text-foreground"
 											aria-label="Reset view"
 										>
@@ -411,42 +458,48 @@ export const EnergyUsageChart = ({
 						className="scroll-fade-y h-20 w-full overflow-hidden"
 						viewportClassName="scroll-fade-y"
 					>
-						<div className="flex flex-wrap items-center gap-1.5 pr-3 py-1">
-							{series.map((item, index) => {
-								const isHidden = hidden.has(item.key);
-								return (
-									<button
-										key={item.key}
-										type="button"
-										onClick={() => toggle(item.key)}
-										aria-pressed={!isHidden}
-										title={item.name}
-										className={cn(
-											"group flex h-6 max-w-48 items-center gap-1.5 rounded-md border px-2 text-xs transition-all select-none cursor-pointer",
-											isHidden
-												? "border-transparent bg-muted/30 text-muted-foreground/50 hover:bg-muted/50"
-												: "border-border/50 bg-background text-foreground shadow-xs hover:bg-muted/40",
-										)}
-									>
-										<span
+						{hasSeries ? (
+							<div className="flex flex-wrap items-center gap-1.5 pr-3 py-1">
+								{series.map((item, index) => {
+									const isHidden = hidden.has(item.key);
+									return (
+										<button
+											key={item.key}
+											type="button"
+											onClick={() => toggle(item.key)}
+											aria-pressed={!isHidden}
+											title={item.name}
 											className={cn(
-												"size-2 shrink-0 rounded-full transition-opacity",
-												isHidden && "opacity-30",
-											)}
-											style={{ backgroundColor: colorFor(index) }}
-										/>
-										<span
-											className={cn(
-												"truncate font-medium",
-												isHidden && "line-through opacity-70",
+												"group flex h-6 max-w-48 items-center gap-1.5 rounded-md border px-2 text-xs transition-all select-none cursor-pointer",
+												isHidden
+													? "border-transparent bg-muted/30 text-muted-foreground/50 hover:bg-muted/50"
+													: "border-border/50 bg-background text-foreground shadow-xs hover:bg-muted/40",
 											)}
 										>
-											{item.name}
-										</span>
-									</button>
-								);
-							})}
-						</div>
+											<span
+												className={cn(
+													"size-2 shrink-0 rounded-full transition-opacity",
+													isHidden && "opacity-30",
+												)}
+												style={{ backgroundColor: colorFor(index) }}
+											/>
+											<span
+												className={cn(
+													"truncate font-medium",
+													isHidden && "line-through opacity-70",
+												)}
+											>
+												{item.name}
+											</span>
+										</button>
+									);
+								})}
+							</div>
+						) : (
+							<div className="flex h-16 w-full items-center justify-center text-xs text-muted-foreground">
+								{isWater ? "No water meters connected" : "No devices recorded"}
+							</div>
+						)}
 					</ScrollArea>
 				</div>
 			</CardContent>
@@ -454,12 +507,12 @@ export const EnergyUsageChart = ({
 	);
 };
 
-const formatWatts = (value: number) =>
-	`${Math.round(value).toLocaleString("en-US")} W`;
+const formatUnit = (value: number, unit: string) =>
+	`${Math.round(value).toLocaleString("en-US")} ${unit}`;
 
 interface ChartStats {
-	currentW: number;
-	peakW: number;
+	current: number;
+	peak: number;
 	topName: string;
 }
 
@@ -475,7 +528,7 @@ const computeStats = (
 	end: number,
 ): ChartStats => {
 	if (series.length === 0 || end < start || rows.length === 0) {
-		return { currentW: 0, peakW: 0, topName: "—" };
+		return { current: 0, peak: 0, topName: "—" };
 	}
 
 	const valueAt = (
@@ -486,19 +539,19 @@ const computeStats = (
 		return typeof value === "number" ? value : 0;
 	};
 
-	let peakW = 0;
+	let peak = 0;
 	for (let i = start; i <= end; i += 1) {
 		const row = rows[i];
 		if (!row) continue;
 		let sum = 0;
 		for (const item of series) sum += valueAt(row, item.key);
-		if (sum > peakW) peakW = sum;
+		if (sum > peak) peak = sum;
 	}
 
 	const lastRow = rows[end];
-	let currentW = 0;
+	let current = 0;
 	if (lastRow) {
-		for (const item of series) currentW += valueAt(lastRow, item.key);
+		for (const item of series) current += valueAt(lastRow, item.key);
 	}
 
 	let topName = "—";
@@ -520,5 +573,5 @@ const computeStats = (
 		}
 	}
 
-	return { currentW, peakW, topName };
+	return { current, peak, topName };
 };

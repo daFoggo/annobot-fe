@@ -70,6 +70,8 @@ export interface DashboardContextSwitcherProps {
 	/** Nếu có, hiện ô tìm kiếm lọc options trong dropdown. */
 	searchPlaceholder?: string;
 	emptyMessage?: string;
+	/** Giới hạn số lượng options hiển thị tối đa trong dropdown (mặc định 5). */
+	maxItems?: number;
 }
 
 /**
@@ -87,6 +89,7 @@ export const DashboardContextSwitcher = ({
 	footer,
 	searchPlaceholder,
 	emptyMessage = "No results.",
+	maxItems = 5,
 }: DashboardContextSwitcherProps) => {
 	const [query, setQuery] = useState("");
 	const [open, setOpen] = useState(false);
@@ -96,6 +99,17 @@ export const DashboardContextSwitcher = ({
 				option.label.toLowerCase().includes(query.toLowerCase()),
 			)
 		: options;
+
+	const displayed = maxItems
+		? query
+			? filtered.slice(0, maxItems)
+			: selected &&
+					!filtered
+						.slice(0, maxItems)
+						.some((opt) => opt.value === selected.value)
+				? [...filtered.slice(0, maxItems - 1), selected]
+				: filtered.slice(0, maxItems)
+		: filtered;
 
 	return (
 		<div className="flex min-w-0 items-center gap-2">
@@ -134,12 +148,12 @@ export const DashboardContextSwitcher = ({
 						</div>
 					) : null}
 					<div className="flex min-w-0 flex-col">
-						{filtered.length === 0 ? (
+						{displayed.length === 0 ? (
 							<p className="px-2 py-1.5 text-xs text-muted-foreground">
 								{emptyMessage}
 							</p>
 						) : (
-							filtered.map((option) => (
+							displayed.map((option) => (
 								<button
 									key={option.value}
 									type="button"

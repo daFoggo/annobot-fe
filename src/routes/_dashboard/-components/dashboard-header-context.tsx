@@ -1,7 +1,6 @@
 import { IconFlask, IconPlus } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useMatch, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
 import {
 	DashboardContextSwitcher,
 	DashboardContextSwitcherItem,
@@ -9,10 +8,7 @@ import {
 	DashboardHeaderDivider,
 } from "@/components/layout/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-	CreateExperimentDialog,
-	experimentListQueryOptions,
-} from "@/features/experiments";
+import { experimentListQueryOptions } from "@/features/experiments";
 
 /**
  * Bộ chọn experiment trên header — thay cho "workspace" trước đây. Experiment là
@@ -23,7 +19,6 @@ import {
  */
 export const DashboardHeaderContext = () => {
 	const navigate = useNavigate();
-	const [createOpen, setCreateOpen] = useState(false);
 	const {
 		data: experiments,
 		isPending,
@@ -67,6 +62,7 @@ export const DashboardHeaderContext = () => {
 				label="Experiment"
 				value={experimentId}
 				options={options}
+				maxItems={5}
 				onValueChange={(id) =>
 					navigate({
 						to: "/dashboard/experiments/$experimentId",
@@ -86,17 +82,12 @@ export const DashboardHeaderContext = () => {
 						<DashboardContextSwitcherSeparator />
 						<DashboardContextSwitcherItem
 							icon={<IconPlus />}
-							onSelect={() => setCreateOpen(true)}
+							onSelect={() => navigate({ to: "/dashboard/experiments/new" })}
 						>
 							New experiment
 						</DashboardContextSwitcherItem>
 					</>
 				}
-			/>
-			<CreateExperimentDialog
-				trigger={null}
-				open={createOpen}
-				onOpenChange={setCreateOpen}
 			/>
 		</>
 	);

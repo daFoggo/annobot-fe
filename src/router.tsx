@@ -47,7 +47,7 @@ declare module "@tanstack/react-router" {
 		getTitle?: () => string;
 		navItems?: DashboardNavGroup[];
 		sidebarNav?: DashboardSidebarNavComponent;
-		breadcrumb?: DashboardCrumb;
+		breadcrumb?: DashboardCrumb | DashboardCrumb[];
 		breadcrumbActions?: ComponentType;
 		productMenu?: DashboardProductMenu;
 	}
@@ -56,7 +56,7 @@ declare module "@tanstack/react-router" {
 		getTitle?: () => string;
 		navItems?: DashboardNavGroup[];
 		sidebarNav?: DashboardSidebarNavComponent;
-		breadcrumb?: DashboardCrumb;
+		breadcrumb?: DashboardCrumb | DashboardCrumb[];
 		breadcrumbActions?: ComponentType;
 		productMenu?: DashboardProductMenu;
 	}

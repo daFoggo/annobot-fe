@@ -25,12 +25,19 @@ export const useDashboardBreadcrumbs = (): DashboardCrumbItem[] =>
 	useMatches({
 		select: (matches) =>
 			matches.flatMap((match): DashboardCrumbItem[] => {
-				const crumb = match.staticData.breadcrumb;
-				if (!crumb) return [];
-				const label = crumb.getLabel
-					? crumb.getLabel(match.loaderData)
-					: crumb.label;
-				return label ? [{ label, to: crumb.to, icon: crumb.icon }] : [];
+				const raw = match.staticData.breadcrumb;
+				if (!raw) return [];
+				const list = Array.isArray(raw) ? raw : [raw];
+				const items: DashboardCrumbItem[] = [];
+				for (const crumb of list) {
+					const label = crumb.getLabel
+						? crumb.getLabel(match.loaderData)
+						: crumb.label;
+					if (label) {
+						items.push({ label, to: crumb.to, icon: crumb.icon });
+					}
+				}
+				return items;
 			}),
 	});
 

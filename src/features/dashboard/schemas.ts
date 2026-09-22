@@ -17,6 +17,7 @@ export const DevicesSummarySchema = z.object({
 	total: z.number().int(),
 	active: z.number().int(),
 	power_meters: z.number().int(),
+	water_meters: z.number().int().optional().default(0),
 });
 
 export const DashboardOverviewSchema = z.object({
@@ -26,6 +27,7 @@ export const DashboardOverviewSchema = z.object({
 	active_power_meters_24h: z.number().int(),
 	stale_sources_24h: z.number().int(),
 	energy_today_kwh: z.number().nullable(),
+	water_today_l: z.number().nullable().optional(),
 	last_data_at: z.string().nullable(),
 	last_sync_at: z.string().nullable(),
 	events_last_24h: z.number().int(),
@@ -34,6 +36,13 @@ export const DashboardOverviewSchema = z.object({
 export type DashboardOverview = z.infer<typeof DashboardOverviewSchema>;
 export type HaHealth = z.infer<typeof HaHealthSchema>;
 export type DevicesSummary = z.infer<typeof DevicesSummarySchema>;
+
+export type ResourceConsumptionType = "power" | "water";
+
+export const RESOURCE_EVENT_TYPES: Record<ResourceConsumptionType, string> = {
+	power: "power_w",
+	water: "water_flow",
+};
 
 /**
  * Energy chart payload (`GET /dashboard/energy`): a uniform timestamp axis

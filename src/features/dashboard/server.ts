@@ -13,9 +13,10 @@ export const getDashboardOverview = async (
 		})
 		.json<DashboardOverview>();
 
-/** `GET /dashboard/energy` — per-source power series for the energy chart. */
+/** `GET /dashboard/energy` — per-source power/water series for the consumption chart. */
 export const getEnergyChart = async (
 	range: EnergyWindow,
+	eventType: string = "power_w",
 ): Promise<EnergyChart> =>
 	api
 		.get("dashboard/energy", {
@@ -23,7 +24,7 @@ export const getEnergyChart = async (
 				since: range.since,
 				until: range.until,
 				bucket: "auto",
-				event_type: "power_w",
+				event_type: eventType,
 			},
 		})
 		.json<EnergyChart>();

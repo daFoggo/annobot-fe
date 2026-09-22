@@ -15,9 +15,10 @@ export const getDashboardOverviewFn = createServerFn({ method: "GET" })
 const EnergyWindowSchema = z.object({
 	since: z.string(),
 	until: z.string(),
+	eventType: z.string().optional().default("power_w"),
 });
 
 export const getEnergyChartFn = createServerFn({ method: "GET" })
 	.middleware([requestLoggerMiddleware])
 	.validator(EnergyWindowSchema)
-	.handler(({ data }) => getEnergyChart(data));
+	.handler(({ data }) => getEnergyChart(data, data.eventType));

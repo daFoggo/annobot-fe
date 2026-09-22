@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { InquirySchema } from "@/features/inquiries/schemas";
 
 /**
  * Experiment từ AnnoBot backend (`GET /experiments`).
@@ -17,6 +18,7 @@ export const ExperimentSchema = z.object({
 	il_timestep_minutes: z.number().int().positive().nullable(),
 	created_at: z.string(),
 	updated_at: z.string(),
+	inquiries: z.array(InquirySchema).default([]),
 });
 
 export type Experiment = z.infer<typeof ExperimentSchema>;
@@ -43,6 +45,24 @@ const TimeStringSchema = z
 	.string()
 	.regex(/^\d{2}:\d{2}(:\d{2})?$/, "Expected a HH:MM or HH:MM:SS time");
 
+/** Một inquiry tạo lồng bên trong `POST /experiments`. */
+export const InquiryNestedCreateSchema = z.object({
+	question: z.string().min(1).max(2048),
+	sensor_ids: z.array(z.string()).default([]),
+	type: z
+		.enum(["appliance", "fact", "performance", "custom"])
+		.nullable()
+		.default("appliance"),
+	goal_gamma: z.string().max(2048).nullable().optional(),
+	detection_rule: z.record(z.string(), z.any()).nullable().optional(),
+	indicators: z.record(z.string(), z.any()).nullable().optional(),
+	annotation_scope: z.record(z.string(), z.any()).nullable().optional(),
+});
+
+export type InquiryNestedCreateInput = z.infer<
+	typeof InquiryNestedCreateSchema
+>;
+
 /**
  * Payload tạo experiment (`POST /experiments`). Chỉ `title` là bắt buộc; các
  * trường còn lại để backend áp default khi bỏ trống.
@@ -53,6 +73,7 @@ export const ExperimentCreateSchema = z.object({
 	ask_window_end: TimeStringSchema.optional(),
 	max_asks_per_day: z.number().int().min(1).nullable().optional(),
 	il_timestep_minutes: z.number().int().min(1).nullable().optional(),
+	inquiries: z.array(InquiryNestedCreateSchema).optional(),
 });
 
 export type ExperimentCreateInput = z.infer<typeof ExperimentCreateSchema>;

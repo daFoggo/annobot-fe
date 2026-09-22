@@ -32,7 +32,10 @@ import {
 	energyChartQueryOptions,
 	type HaHealth,
 	last24hWindow,
+	RESOURCE_EVENT_TYPES,
+	type ResourceConsumptionType,
 } from "@/features/dashboard";
+
 import { cn } from "@/lib/utils";
 import { resolveTimezone, useTimezoneStore } from "@/stores/timezone";
 import { EnergyUsageChart } from "./-components/energy-chart";
@@ -119,6 +122,9 @@ const HomePage = () => {
 	const userTz = user?.timezone || "UTC";
 	const effectiveTz = resolveTimezone(tzChoice, userTz);
 
+	const [resourceType, setResourceType] =
+		useState<ResourceConsumptionType>("power");
+
 	// Overview is tz-sensitive (energy_today uses the zone's local midnight),
 	// but switching timezone must not blank the page: refetch in the background
 	// and keep showing the previous stats (Grafana-style) until fresh data lands.
@@ -126,7 +132,13 @@ const HomePage = () => {
 		...dashboardOverviewQueryOptions(effectiveTz),
 		placeholderData: keepPreviousData,
 	});
-	const { data: energy } = useSuspenseQuery(energyChartQueryOptions(range));
+	const { data: initialEnergy } = useSuspenseQuery(
+		energyChartQueryOptions(range, "power_w"),
+	);
+	const { data: consumptionData } = useQuery({
+		...energyChartQueryOptions(range, RESOURCE_EVENT_TYPES[resourceType]),
+		placeholderData: keepPreviousData,
+	});
 
 	// Loader prefetches overview, so this only guards the (unreachable) no-cache
 	// path; placeholderData keeps stats visible while a tz change refetches.
@@ -213,7 +225,7 @@ const HomePage = () => {
 									{overview.devices.active} / {overview.devices.total}
 								</span>
 							}
-							description={`${overview.devices.power_meters} power meters configured`}
+							description={`${overview.devices.power_meters} power meters${overview.devices.water_meters ? `, ${overview.devices.water_meters} water meters` : ""} configured`}
 						/>
 						<StatBlock
 							icon={IconPlugConnected}
@@ -263,7 +275,9 @@ const HomePage = () => {
 				</div>
 
 				<EnergyUsageChart
-					data={energy}
+					data={consumptionData ?? initialEnergy}
+					resourceType={resourceType}
+					onResourceTypeChange={setResourceType}
 					timezone={effectiveTz}
 					className="lg:col-span-3"
 				/>

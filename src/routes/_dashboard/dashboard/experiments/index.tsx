@@ -6,7 +6,7 @@ import {
 	IconSearch,
 } from "@tabler/icons-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { DashboardPage } from "@/components/layout/dashboard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,10 +42,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-	CreateExperimentDialog,
-	experimentListQueryOptions,
-} from "@/features/experiments";
+import { experimentListQueryOptions } from "@/features/experiments";
 import { getErrorMessage } from "@/lib/error";
 import { ExperimentGrid } from "./-components/experiment-grid";
 import { ExperimentList } from "./-components/experiment-list";
@@ -130,14 +127,10 @@ const ExperimentsPage = () => {
 			title="Experiments"
 			description="An experiment is your workspace to explore a service — it groups the inquiries, sensors and annotations for one study."
 			actions={
-				<CreateExperimentDialog
-					trigger={
-						<Button>
-							<IconPlus data-icon="inline-start" />
-							New experiment
-						</Button>
-					}
-				/>
+				<Button render={<Link to="/dashboard/experiments/new" />}>
+					<IconPlus data-icon="inline-start" />
+					New experiment
+				</Button>
 			}
 		>
 			{isPending ? (
@@ -212,14 +205,10 @@ const ExperimentsPage = () => {
 								</EmptyDescription>
 							</EmptyHeader>
 							<EmptyContent>
-								<CreateExperimentDialog
-									trigger={
-										<Button>
-											<IconPlus data-icon="inline-start" />
-											New experiment
-										</Button>
-									}
-								/>
+								<Button render={<Link to="/dashboard/experiments/new" />}>
+									<IconPlus data-icon="inline-start" />
+									New experiment
+								</Button>
 							</EmptyContent>
 						</Empty>
 					) : experiments.length === 0 ? (
