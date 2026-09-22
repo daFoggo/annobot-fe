@@ -2,8 +2,6 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { AppLogo } from "@/components/common/app-logo";
 import { ThemeToggle } from "@/components/common/theme-provider";
-import { usePathname } from "../dashboard-nav";
-import { useDashboardShell } from "../dashboard-shell-context";
 import {
 	DashboardBreadcrumb,
 	useDashboardBreadcrumbActions,
@@ -33,19 +31,13 @@ export const DashboardHeader = ({ context, actions }: DashboardHeaderProps) => {
 	const hasBreadcrumb = useDashboardBreadcrumbs().length > 0;
 	const BreadcrumbActions = useDashboardBreadcrumbActions();
 	const hasBreadcrumbArea = hasBreadcrumb || Boolean(BreadcrumbActions);
-	const hasNav = useDashboardShell().state.hasNav;
-	const pathname = usePathname();
-	// Ở /dashboard (Home) logo giữ tiêu đề; các nơi khác có nav/breadcrumb thì
-	// chỉ còn icon để nhường chỗ cho ngữ cảnh.
-	const hideLogoTitle =
-		hasBreadcrumbArea || (hasNav && pathname !== "/dashboard");
 
 	return (
 		<header className="hidden h-11 shrink-0 items-center border-b bg-sidebar md:flex md:h-12">
 			<div className="flex h-full flex-1 items-center justify-between gap-x-8 overflow-x-auto pr-3 pl-4">
 				<div className="flex min-w-0 items-center text-sm">
 					<Link to="/" aria-label="Home" className="flex shrink-0 items-center">
-						<AppLogo hideTitle={hideLogoTitle} />
+						<AppLogo size="sm" />
 					</Link>
 					{context}
 					{hasBreadcrumbArea ? (

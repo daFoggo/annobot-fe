@@ -10,20 +10,26 @@ import {
 	listExperimentsFn,
 	updateExperimentFn,
 } from "./functions";
-import type { ExperimentCreateInput, ExperimentUpdateInput } from "./schemas";
+import type {
+	ExperimentCreateInput,
+	ExperimentListParams,
+	ExperimentUpdateInput,
+} from "./schemas";
 
 export const experimentKeys = {
 	all: ["experiments"] as const,
 	lists: () => [...experimentKeys.all, "list"] as const,
+	list: (params?: ExperimentListParams) =>
+		[...experimentKeys.lists(), params ?? {}] as const,
 	details: () => [...experimentKeys.all, "detail"] as const,
 	detail: (id: string) => [...experimentKeys.details(), id] as const,
 };
 
 /** Query options cho danh sách experiment. */
-export const experimentListQueryOptions = () =>
+export const experimentListQueryOptions = (params?: ExperimentListParams) =>
 	queryOptions({
-		queryKey: experimentKeys.lists(),
-		queryFn: () => listExperimentsFn(),
+		queryKey: experimentKeys.list(params),
+		queryFn: () => listExperimentsFn({ data: params }),
 	});
 
 /** Query options cho một experiment theo id. */

@@ -4,12 +4,22 @@ import { api } from "@/lib/ky";
 import type {
 	Experiment,
 	ExperimentCreateInput,
+	ExperimentFindResult,
+	ExperimentListParams,
 	ExperimentUpdateInput,
 } from "./schemas";
 
-/** `GET /experiments` — danh sách experiment của user hiện tại. */
-export const listExperiments = async (): Promise<Experiment[]> =>
-	api.get("experiments").json<Experiment[]>();
+/** `GET /experiments` — danh sách phân trang experiment của user hiện tại. */
+export const listExperiments = async (
+	params?: ExperimentListParams,
+): Promise<ExperimentFindResult> => {
+	const searchParams = new URLSearchParams();
+	if (params?.page != null) searchParams.set("page", String(params.page));
+	if (params?.page_size != null)
+		searchParams.set("page_size", String(params.page_size));
+
+	return api.get("experiments", { searchParams }).json<ExperimentFindResult>();
+};
 
 /** `GET /experiments/{id}`. */
 export const getExperiment = async (id: string): Promise<Experiment> =>

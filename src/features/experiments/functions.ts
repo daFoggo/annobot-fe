@@ -1,7 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import * as z from "zod";
 import { requestLoggerMiddleware } from "@/lib/middleware";
-import { ExperimentCreateSchema, ExperimentUpdateSchema } from "./schemas";
+import {
+	ExperimentCreateSchema,
+	ExperimentListParamsSchema,
+	ExperimentUpdateSchema,
+} from "./schemas";
 import {
 	createExperiment,
 	deleteExperiment,
@@ -12,7 +16,8 @@ import {
 
 export const listExperimentsFn = createServerFn({ method: "GET" })
 	.middleware([requestLoggerMiddleware])
-	.handler(() => listExperiments());
+	.validator(ExperimentListParamsSchema.optional())
+	.handler(({ data }) => listExperiments(data));
 
 export const getExperimentFn = createServerFn({ method: "GET" })
 	.middleware([requestLoggerMiddleware])

@@ -1,6 +1,6 @@
 import {
 	IconBook,
-	IconBrandGithub,
+	IconBrandGitlab,
 	IconHelpCircle,
 	IconMessage,
 } from "@tabler/icons-react";
@@ -35,8 +35,8 @@ export const DashboardHelpMenu = () => (
 					<a href={SITE_CONFIG.app.github} target="_blank" rel="noreferrer" />
 				}
 			>
-				<IconBrandGithub />
-				GitHub repository
+				<IconBrandGitlab />
+				GitLab repository
 			</DropdownMenuItem>
 			<DropdownMenuItem
 				render={

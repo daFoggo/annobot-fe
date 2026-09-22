@@ -21,6 +21,23 @@ export const ExperimentSchema = z.object({
 
 export type Experiment = z.infer<typeof ExperimentSchema>;
 
+/** Phản hồi phân trang theo chuẩn FindResult của backend. */
+export const ExperimentFindResultSchema = z.object({
+	founds: z.array(ExperimentSchema),
+	total_count: z.number().int(),
+	page: z.number().int(),
+	page_size: z.number().int(),
+});
+
+export type ExperimentFindResult = z.infer<typeof ExperimentFindResultSchema>;
+
+export const ExperimentListParamsSchema = z.object({
+	page: z.number().int().min(1).optional(),
+	page_size: z.number().int().min(1).max(100).optional(),
+});
+
+export type ExperimentListParams = z.infer<typeof ExperimentListParamsSchema>;
+
 /** `time` của backend chấp nhận "HH:MM" hoặc "HH:MM:SS". */
 const TimeStringSchema = z
 	.string()

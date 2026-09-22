@@ -30,5 +30,8 @@ const DevicesPage = () => (
 );
 
 export const Route = createFileRoute("/_dashboard/dashboard/devices/")({
+	staticData: {
+		breadcrumb: { label: "Devices" },
+	},
 	component: DevicesPage,
 });

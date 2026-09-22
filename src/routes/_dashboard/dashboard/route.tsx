@@ -1,9 +1,9 @@
-import { IconDeviceDesktop, IconHome } from "@tabler/icons-react";
+import { IconDevices, IconFlask, IconHome } from "@tabler/icons-react";
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 
 /**
  * Layout của section dashboard: sidebar cấp 1 xuất hiện ngay từ route này với
- * nav Home/Devices; các trang con render trong content.
+ * nav Home/Experiments/Devices; các trang con render trong content.
  */
 export const Route = createFileRoute("/_dashboard/dashboard")({
 	staticData: {
@@ -13,9 +13,14 @@ export const Route = createFileRoute("/_dashboard/dashboard")({
 				items: [
 					{ label: "Home", to: "/dashboard", icon: IconHome, exact: true },
 					{
+						label: "Experiments",
+						to: "/dashboard/experiments",
+						icon: IconFlask,
+					},
+					{
 						label: "Devices",
 						to: "/dashboard/devices",
-						icon: IconDeviceDesktop,
+						icon: IconDevices,
 						exact: true,
 					},
 				],

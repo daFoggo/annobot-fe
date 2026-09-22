@@ -48,7 +48,7 @@ export const DashboardHeaderContext = () => {
 		);
 	}
 
-	const options = (experiments ?? []).map((experiment) => ({
+	const options = (experiments?.founds ?? []).map((experiment) => ({
 		value: experiment.id,
 		label: experiment.title,
 	}));
