@@ -3,9 +3,14 @@ import * as z from "zod";
 import { requestLoggerMiddleware } from "@/lib/middleware";
 import { getDashboardOverview, getEnergyChart } from "./server";
 
+const TimezoneSchema = z.object({
+	tz: z.string().optional(),
+});
+
 export const getDashboardOverviewFn = createServerFn({ method: "GET" })
 	.middleware([requestLoggerMiddleware])
-	.handler(() => getDashboardOverview());
+	.validator(TimezoneSchema)
+	.handler(({ data }) => getDashboardOverview(data.tz));
 
 const EnergyWindowSchema = z.object({
 	since: z.string(),

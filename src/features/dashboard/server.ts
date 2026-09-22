@@ -4,8 +4,14 @@ import { api } from "@/lib/ky";
 import type { DashboardOverview, EnergyChart, EnergyWindow } from "./schemas";
 
 /** `GET /dashboard/overview` — house-level telemetry stat boxes. */
-export const getDashboardOverview = async (): Promise<DashboardOverview> =>
-	api.get("dashboard/overview").json<DashboardOverview>();
+export const getDashboardOverview = async (
+	tz?: string,
+): Promise<DashboardOverview> =>
+	api
+		.get("dashboard/overview", {
+			searchParams: tz ? { tz } : undefined,
+		})
+		.json<DashboardOverview>();
 
 /** `GET /dashboard/energy` — per-source power series for the energy chart. */
 export const getEnergyChart = async (

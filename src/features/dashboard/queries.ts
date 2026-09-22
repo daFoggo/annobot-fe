@@ -4,16 +4,17 @@ import type { EnergyWindow } from "./schemas";
 
 export const dashboardKeys = {
 	all: ["dashboard"] as const,
-	overview: () => [...dashboardKeys.all, "overview"] as const,
+	overview: (tz?: string) =>
+		[...dashboardKeys.all, "overview", tz ?? ""] as const,
 	energy: (range: EnergyWindow) =>
 		[...dashboardKeys.all, "energy", range] as const,
 };
 
 /** Query options cho các stat box cấp nhà. */
-export const dashboardOverviewQueryOptions = () =>
+export const dashboardOverviewQueryOptions = (tz?: string) =>
 	queryOptions({
-		queryKey: dashboardKeys.overview(),
-		queryFn: () => getDashboardOverviewFn(),
+		queryKey: dashboardKeys.overview(tz),
+		queryFn: () => getDashboardOverviewFn({ data: { tz } }),
 	});
 
 /** Query options cho series công suất theo từng thiết bị. */

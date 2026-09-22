@@ -42,7 +42,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	Tooltip,
 	TooltipContent,
-	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { EnergyChart } from "@/features/dashboard";
@@ -62,12 +61,49 @@ const colorFor = (index: number) =>
 
 type ViewMode = "stack" | "overlay";
 
-/** ISO time slice — deterministic across SSR/client (no timezone formatting). */
-const timeLabel = (iso: string) => iso.slice(11, 16);
+const timeLabelCache = new Map<string, Intl.DateTimeFormat>();
+
+/** Local HH:MM label for a UTC instant, formatted in the display zone.
+ *  Formatter instances are cached per zone (Grafana-style) so switching the
+ *  timezone only recomputes labels — never the data. */
+const timeLabel = (iso: string, timezone: string) => {
+	let formatter = timeLabelCache.get(timezone);
+	if (!formatter) {
+		formatter = new Intl.DateTimeFormat("en-GB", {
+			timeZone: timezone,
+			hour: "2-digit",
+			minute: "2-digit",
+			hour12: false,
+		});
+		timeLabelCache.set(timezone, formatter);
+	}
+	return formatter.format(new Date(iso));
+};
+
+/** Human window duration, e.g. "24 hours" / "2 days". */
+const windowLabel = (since: string, until: string) => {
+	const hours = Math.round(
+		(new Date(until).getTime() - new Date(since).getTime()) / 3_600_000,
+	);
+	if (hours >= 48 && hours % 24 === 0) return `${hours / 24} days`;
+	return `${hours} hours`;
+};
+
+/** Human label for the bucket resolution, e.g. "15 minutes" → "15-min averages". */
+const bucketLabel = (bucket: string) =>
+	({
+		"1 minute": "1-min averages",
+		"5 minutes": "5-min averages",
+		"15 minutes": "15-min averages",
+		"30 minutes": "30-min averages",
+		"1 hour": "hourly averages",
+	})[bucket] ?? `${bucket} averages`;
 
 export interface EnergyUsageChartProps {
 	data: EnergyChart;
 	className?: string;
+	/** Effective IANA zone used to format axis/tooltip/header labels. */
+	timezone?: string;
 }
 
 /**
@@ -78,7 +114,9 @@ export interface EnergyUsageChartProps {
 export const EnergyUsageChart = ({
 	data,
 	className,
+	timezone,
 }: EnergyUsageChartProps) => {
+	const zone = timezone ?? "UTC";
 	const [mode, setMode] = useState<ViewMode>("stack");
 	const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
 	const [range, setRange] = useState<{
@@ -183,8 +221,8 @@ export const EnergyUsageChart = ({
 			<CardHeader className="pb-2">
 				<CardTitle>Power consumption</CardTitle>
 				<CardDescription className="font-mono text-xs">
-					{timeLabel(data.since)} – {timeLabel(data.until)} · bucket{" "}
-					{data.bucket}
+					Last {windowLabel(data.since, data.until)} ·{" "}
+					{bucketLabel(data.bucket)}
 				</CardDescription>
 				<CardAction>
 					<Tabs
@@ -256,19 +294,24 @@ export const EnergyUsageChart = ({
 							axisLine={false}
 							tickMargin={8}
 							minTickGap={48}
-							tickFormatter={timeLabel}
+							interval="preserveStartEnd"
+							tickFormatter={(value) => timeLabel(String(value), zone)}
 						/>
 						<YAxis
 							tickLine={false}
 							axisLine={false}
 							width={56}
-							tickFormatter={(value: number) => `${value} W`}
+							tickFormatter={(value: number) =>
+								value === 0 ? "" : `${value} W`
+							}
 						/>
 						<ChartTooltip
+							offset={32}
 							content={
 								<ChartTooltipContent
 									indicator="line"
-									labelFormatter={(value) => timeLabel(String(value))}
+									className="max-h-64 overflow-y-auto"
+									labelFormatter={(value) => timeLabel(String(value), zone)}
 								/>
 							}
 						/>
@@ -341,27 +384,26 @@ export const EnergyUsageChart = ({
 							>
 								All
 							</Button>
-							<TooltipProvider delay={200}>
-								<Tooltip>
-									<TooltipTrigger
-										render={
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												onClick={reset}
-												className="size-6 p-0 text-muted-foreground hover:text-foreground"
-												aria-label="Reset view"
-											>
-												<IconRotate className="size-3.5" />
-											</Button>
-										}
-									/>
-									<TooltipContent side="top" className="text-xs">
-										Reset view
-									</TooltipContent>
-								</Tooltip>
-							</TooltipProvider>
+
+							<Tooltip>
+								<TooltipTrigger
+									render={
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={reset}
+											className="size-6 p-0 text-muted-foreground hover:text-foreground"
+											aria-label="Reset view"
+										>
+											<IconRotate className="size-3.5" />
+										</Button>
+									}
+								/>
+								<TooltipContent side="top" className="text-xs">
+									Reset view
+								</TooltipContent>
+							</Tooltip>
 						</div>
 					</div>
 

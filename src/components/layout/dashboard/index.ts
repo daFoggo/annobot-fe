@@ -30,6 +30,7 @@ export {
 	DashboardContextSwitcherSeparator,
 } from "./header/dashboard-context-switcher";
 export { DashboardHeaderDivider } from "./header/dashboard-header-divider";
+export { DashboardTimezonePicker } from "./header/dashboard-timezone-picker";
 export { ProductMenuNav } from "./product-menu/product-menu";
 export { ProductMenuBar } from "./product-menu/product-menu-bar";
 export type { ProductMenuContentProps } from "./product-menu/product-menu-content";
