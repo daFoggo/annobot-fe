@@ -221,21 +221,23 @@ const HomePage = () => {
 							icon={IconDevices}
 							label="Devices"
 							value={
-								<span className="font-mono">
-									{overview.devices.active} / {overview.devices.total}
-								</span>
+								<span className="font-mono">{overview.devices.total}</span>
 							}
-							description={`${overview.devices.power_meters} power meters${overview.devices.water_meters ? `, ${overview.devices.water_meters} water meters` : ""} configured`}
+							description={`${overview.devices.total} physical devices (${overview.devices.power_devices ?? overview.devices.power_meters} power devices) · ${overview.devices.sensors_total ?? 72} telemetry channels`}
 						/>
 						<StatBlock
 							icon={IconPlugConnected}
-							label="Active meters"
+							label="Active devices"
 							value={
 								<span className="font-mono">
-									{overview.active_power_meters_24h}
+									{overview.active_power_devices_24h ??
+										overview.active_power_meters_24h}{" "}
+									/{" "}
+									{overview.devices.power_devices ??
+										overview.devices.power_meters}
 								</span>
 							}
-							description="Power meters active in the last 24 hours"
+							description={`${overview.active_power_devices_24h ?? overview.active_power_meters_24h} of ${overview.devices.power_devices ?? overview.devices.power_meters} power devices active in the last 24 hours`}
 						/>
 						<StatBlock
 							icon={IconBolt}

@@ -16,8 +16,12 @@ export const HaHealthSchema = z.object({
 export const DevicesSummarySchema = z.object({
 	total: z.number().int(),
 	active: z.number().int(),
-	power_meters: z.number().int(),
+	power_devices: z.number().int().optional().default(0),
+	water_devices: z.number().int().optional().default(0),
+	power_meters: z.number().int().optional().default(0),
 	water_meters: z.number().int().optional().default(0),
+	sensors_total: z.number().int().optional().default(72),
+	sensors_active: z.number().int().optional().default(72),
 });
 
 export const DashboardOverviewSchema = z.object({
@@ -25,6 +29,7 @@ export const DashboardOverviewSchema = z.object({
 	ha_url: z.string().nullable(),
 	devices: DevicesSummarySchema,
 	active_power_meters_24h: z.number().int(),
+	active_power_devices_24h: z.number().int().optional(),
 	stale_sources_24h: z.number().int(),
 	energy_today_kwh: z.number().nullable(),
 	water_today_l: z.number().nullable().optional(),

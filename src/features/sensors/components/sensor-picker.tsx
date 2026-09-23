@@ -9,12 +9,14 @@ import {
 	IconChevronsRight,
 	IconCloud,
 	IconDroplet,
+	IconLayersIntersect,
 	IconSearch,
 	IconTemperature,
 } from "@tabler/icons-react";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	InputGroup,
@@ -23,6 +25,7 @@ import {
 } from "@/components/ui/input-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
 	Tooltip,
 	TooltipContent,
@@ -38,10 +41,64 @@ export interface SensorPickerProps {
 	onChange: (ids: string[]) => void;
 }
 
-function groupDevicesByZone(devices: Device[]): Map<string, Device[]> {
+export type GroupBy = "zone" | "type";
+
+export const TYPE_CONFIG: Record<
+	string,
+	{ label: string; icon: typeof IconBolt; badgeClass: string }
+> = {
+	power: {
+		label: "Power",
+		icon: IconBolt,
+		badgeClass:
+			"bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+	},
+	climate: {
+		label: "Climate",
+		icon: IconTemperature,
+		badgeClass:
+			"bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
+	},
+	environment: {
+		label: "Environment",
+		icon: IconCloud,
+		badgeClass:
+			"bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+	},
+	multiple: {
+		label: "Multiple",
+		icon: IconLayersIntersect,
+		badgeClass:
+			"bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20",
+	},
+	water: {
+		label: "Water",
+		icon: IconDroplet,
+		badgeClass:
+			"bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+	},
+};
+
+function normalizeCategory(category: string): string {
+	if (category === "plug") return "power";
+	return category || "other";
+}
+
+function groupDevices(
+	devices: Device[],
+	groupBy: GroupBy,
+): Map<string, Device[]> {
 	const map = new Map<string, Device[]>();
 	for (const device of devices) {
-		const key = device.zone || "Other";
+		let key: string;
+		if (groupBy === "zone") {
+			key = device.zone || "Unknown Area";
+		} else {
+			const cat = normalizeCategory(device.category);
+			key = TYPE_CONFIG[cat]?.label
+				? `${TYPE_CONFIG[cat].label} Devices`
+				: "Other Devices";
+		}
 		const list = map.get(key) ?? [];
 		list.push(device);
 		map.set(key, list);
@@ -51,8 +108,7 @@ function groupDevicesByZone(devices: Device[]): Map<string, Device[]> {
 
 /**
  * Bộ chọn Thiết bị 2 cột (Available Devices | Selected Devices),
- * lấy trực tiếp 19 thiết bị vật lý đã gom nhóm từ AnnoBot Backend (`GET /devices`),
- * tự động map toàn bộ sensor_ids của thiết bị vào inquiry.
+ * phân loại theo cả 2 chiều: Zone (Khu vực) và Type (Loại thiết bị: Power, Climate, Environment, Multiple).
  */
 export const SensorPicker = ({ value, onChange }: SensorPickerProps) => {
 	const {
@@ -62,21 +118,29 @@ export const SensorPicker = ({ value, onChange }: SensorPickerProps) => {
 		error,
 	} = useQuery(deviceListQueryOptions());
 	const [query, setQuery] = useState("");
+	const [groupBy, setGroupBy] = useState<GroupBy>("zone");
+	const [typeFilter, setTypeFilter] = useState<string>("all");
 	const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
 	const allDevices = useMemo(() => devices ?? [], [devices]);
 
-	// Lọc theo search
+	// Lọc theo search và theo typeFilter
 	const filtered = useMemo(() => {
 		const needle = query.trim().toLowerCase();
-		if (!needle) return allDevices;
-		return allDevices.filter(
-			(device) =>
+		return allDevices.filter((device) => {
+			const cat = normalizeCategory(device.category);
+			if (typeFilter !== "all" && cat !== typeFilter) {
+				return false;
+			}
+			if (!needle) return true;
+			return (
 				device.name.toLowerCase().includes(needle) ||
 				device.zone.toLowerCase().includes(needle) ||
-				device.metrics_summary.toLowerCase().includes(needle),
-		);
-	}, [query, allDevices]);
+				cat.toLowerCase().includes(needle) ||
+				device.metrics_summary.toLowerCase().includes(needle)
+			);
+		});
+	}, [query, allDevices, typeFilter]);
 
 	// Phân loại Available vs Selected theo presence của sensor_ids trong `value`
 	const available = filtered.filter(
@@ -86,20 +150,19 @@ export const SensorPicker = ({ value, onChange }: SensorPickerProps) => {
 		device.sensor_ids.some((id) => value.includes(id)),
 	);
 
-	const availableByZone = useMemo(
-		() => groupDevicesByZone(available),
-		[available],
+	const availableGroups = useMemo(
+		() => groupDevices(available, groupBy),
+		[available, groupBy],
 	);
-	const selectedByZone = useMemo(
-		() => groupDevicesByZone(selected),
-		[selected],
+	const selectedGroups = useMemo(
+		() => groupDevices(selected, groupBy),
+		[selected, groupBy],
 	);
 
-	const allZones = useMemo(() => {
-		const zones = new Set<string>();
-		for (const device of allDevices) zones.add(device.zone || "Other");
-		return [...zones].sort();
-	}, [allDevices]);
+	const allGroupKeys = useMemo(
+		() => [...groupDevices(allDevices, groupBy).keys()].sort(),
+		[allDevices, groupBy],
+	);
 
 	if (isPending) {
 		return (
@@ -120,11 +183,11 @@ export const SensorPicker = ({ value, onChange }: SensorPickerProps) => {
 		);
 	}
 
-	const toggle = (zone: string) => {
+	const toggle = (key: string) => {
 		setCollapsed((prev) => {
 			const next = new Set(prev);
-			if (next.has(zone)) next.delete(zone);
-			else next.add(zone);
+			if (next.has(key)) next.delete(key);
+			else next.add(key);
 			return next;
 		});
 	};
@@ -149,79 +212,145 @@ export const SensorPicker = ({ value, onChange }: SensorPickerProps) => {
 	};
 
 	return (
-		<div className="grid grid-cols-2 gap-4">
-			<PickerColumn
-				title={`Available Devices (${available.length})`}
-				search={
-					<InputGroup className="h-7">
-						<InputGroupAddon align="inline-start">
-							<IconSearch data-icon />
-						</InputGroupAddon>
-						<InputGroupInput
-							placeholder="Search devices..."
-							value={query}
-							onChange={(event) => setQuery(event.target.value)}
-						/>
-					</InputGroup>
-				}
-				action={
-					<Tooltip>
-						<TooltipTrigger
-							render={
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon-sm"
-									onClick={addAll}
-									disabled={available.length === 0}
-									aria-label="Move all to selected"
-								>
-									<IconChevronsRight />
-								</Button>
-							}
-						/>
-						<TooltipContent>Move all to selected</TooltipContent>
-					</Tooltip>
-				}
-				emptyMessage={
-					available.length === 0 ? "All devices selected" : "No devices found"
-				}
-				zones={allZones}
-				byZone={availableByZone}
-				collapsed={collapsed}
-				onToggle={toggle}
-				onPick={add}
-				direction="right"
-			/>
-			<PickerColumn
-				title={`Selected Devices (${selected.length})`}
-				action={
-					<Tooltip>
-						<TooltipTrigger
-							render={
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon-sm"
-									onClick={removeAll}
-									disabled={selected.length === 0}
-									aria-label="Move all to available"
-								>
-									<IconChevronsLeft />
-								</Button>
-							}
-						/>
-						<TooltipContent>Move all to available</TooltipContent>
-					</Tooltip>
-				}
-				emptyMessage="No devices selected"
-				zones={allZones}
-				byZone={selectedByZone}
-				collapsed={collapsed}
-				onToggle={toggle}
-				onPick={remove}
-				direction="left"
-			/>
+		<div className="flex flex-col gap-3">
+			{/* Controls: Type Filter Chips + Group By Switcher */}
+			<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-1.5">
+				{/* Type Filter Chips */}
+				<div className="flex items-center gap-1 overflow-x-auto">
+					{[
+						{ value: "all", label: "All" },
+						{ value: "power", label: "Power" },
+						{ value: "climate", label: "Climate" },
+						{ value: "environment", label: "Environment" },
+						{ value: "multiple", label: "Multiple" },
+					].map((filter) => {
+						const count =
+							filter.value === "all"
+								? allDevices.length
+								: allDevices.filter(
+										(d) => normalizeCategory(d.category) === filter.value,
+									).length;
+						if (count === 0 && filter.value !== "all") return null;
+						const isSelected = typeFilter === filter.value;
+						return (
+							<Button
+								key={filter.value}
+								type="button"
+								variant={isSelected ? "secondary" : "ghost"}
+								size="sm"
+								onClick={() => setTypeFilter(filter.value)}
+								className={cn(
+									"h-6 px-2 text-xs rounded-md cursor-pointer",
+									isSelected
+										? "bg-foreground/10 text-foreground font-semibold shadow-2xs"
+										: "text-muted-foreground hover:text-foreground",
+								)}
+							>
+								{filter.label} ({count})
+							</Button>
+						);
+					})}
+				</div>
+
+				{/* Group By Selector */}
+				<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+					<span className="font-mono text-[10px] tracking-wider uppercase">
+						Group by:
+					</span>
+					<ToggleGroup
+						variant="outline"
+						size="sm"
+						spacing={0}
+						value={[groupBy]}
+						onValueChange={(val) => {
+							if (val[0]) setGroupBy(val[0] as GroupBy);
+						}}
+						className="h-6"
+					>
+						<ToggleGroupItem value="zone" className="h-6 px-2 text-xs">
+							Zone
+						</ToggleGroupItem>
+						<ToggleGroupItem value="type" className="h-6 px-2 text-xs">
+							Type
+						</ToggleGroupItem>
+					</ToggleGroup>
+				</div>
+			</div>
+
+			<div className="grid grid-cols-2 gap-4">
+				<PickerColumn
+					title={`Available Devices (${available.length})`}
+					search={
+						<InputGroup className="h-7">
+							<InputGroupAddon align="inline-start">
+								<IconSearch data-icon />
+							</InputGroupAddon>
+							<InputGroupInput
+								placeholder="Search devices..."
+								value={query}
+								onChange={(event) => setQuery(event.target.value)}
+							/>
+						</InputGroup>
+					}
+					action={
+						<Tooltip>
+							<TooltipTrigger
+								render={
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										onClick={addAll}
+										disabled={available.length === 0}
+										aria-label="Move all to selected"
+									>
+										<IconChevronsRight />
+									</Button>
+								}
+							/>
+							<TooltipContent>Move all to selected</TooltipContent>
+						</Tooltip>
+					}
+					emptyMessage={
+						available.length === 0 ? "All devices selected" : "No devices found"
+					}
+					groupKeys={allGroupKeys}
+					groupedMap={availableGroups}
+					collapsed={collapsed}
+					onToggle={toggle}
+					onPick={add}
+					direction="right"
+				/>
+				<PickerColumn
+					title={`Selected Devices (${selected.length})`}
+					action={
+						<Tooltip>
+							<TooltipTrigger
+								render={
+									<Button
+										type="button"
+										variant="ghost"
+										size="icon-sm"
+										onClick={removeAll}
+										disabled={selected.length === 0}
+										aria-label="Move all to available"
+									>
+										<IconChevronsLeft />
+									</Button>
+								}
+							/>
+							<TooltipContent>Move all to available</TooltipContent>
+						</Tooltip>
+					}
+					emptyMessage="No devices selected"
+					groupKeys={allGroupKeys}
+					groupedMap={selectedGroups}
+					collapsed={collapsed}
+					onToggle={toggle}
+					onPick={remove}
+					direction="left"
+				/>
+			</div>
 		</div>
 	);
 };
@@ -231,8 +360,8 @@ const PickerColumn = ({
 	search,
 	action,
 	emptyMessage,
-	zones,
-	byZone,
+	groupKeys,
+	groupedMap,
 	collapsed,
 	onToggle,
 	onPick,
@@ -242,14 +371,16 @@ const PickerColumn = ({
 	search?: React.ReactNode;
 	action?: React.ReactNode;
 	emptyMessage: string;
-	zones: string[];
-	byZone: Map<string, Device[]>;
+	groupKeys: string[];
+	groupedMap: Map<string, Device[]>;
 	collapsed: Set<string>;
-	onToggle: (zone: string) => void;
+	onToggle: (groupKey: string) => void;
 	onPick: (device: Device) => void;
 	direction: "left" | "right";
 }) => {
-	const hasAny = zones.some((zone) => (byZone.get(zone) ?? []).length > 0);
+	const hasAny = groupKeys.some(
+		(key) => (groupedMap.get(key) ?? []).length > 0,
+	);
 
 	return (
 		<div className="flex min-h-0 flex-col overflow-hidden rounded-lg border bg-card">
@@ -264,17 +395,17 @@ const PickerColumn = ({
 			) : null}
 			<ScrollArea className="h-64" viewportClassName="scroll-fade">
 				<div className="flex flex-col p-2.5">
-					{zones.map((zone) => {
-						const items = byZone.get(zone) ?? [];
+					{groupKeys.map((key) => {
+						const items = groupedMap.get(key) ?? [];
 						if (items.length === 0) return null;
-						const isOpen = !collapsed.has(zone);
+						const isOpen = !collapsed.has(key);
 						return (
-							<div key={zone} className="mb-1 last:mb-0">
+							<div key={key} className="mb-1 last:mb-0">
 								<Button
 									type="button"
 									variant="ghost"
 									size="sm"
-									onClick={() => onToggle(zone)}
+									onClick={() => onToggle(key)}
 									className="w-full justify-start gap-1.5 px-2 font-medium"
 								>
 									<IconChevronDown
@@ -283,7 +414,7 @@ const PickerColumn = ({
 											!isOpen && "-rotate-90",
 										)}
 									/>
-									<span className="truncate">{zone}</span>
+									<span className="truncate">{key}</span>
 									<span className="text-xs text-muted-foreground">
 										({items.length})
 									</span>
@@ -324,32 +455,41 @@ const DeviceRow = ({
 	onClick: () => void;
 }) => {
 	const Arrow = direction === "right" ? IconChevronRight : IconChevronLeft;
-
-	let Icon = IconBolt;
-	if (device.category === "climate") {
-		Icon = IconTemperature;
-	} else if (device.category === "environment") {
-		Icon = IconCloud;
-	} else if (device.category === "water") {
-		Icon = IconDroplet;
-	}
+	const cat = normalizeCategory(device.category);
+	const config = TYPE_CONFIG[cat] ?? {
+		label: "Device",
+		icon: IconBolt,
+		badgeClass: "bg-muted text-muted-foreground",
+	};
+	const Icon = config.icon;
 
 	return (
 		<Button
 			type="button"
 			variant="ghost"
 			onClick={onClick}
-			className="h-auto w-full items-center justify-start gap-2.5 rounded-lg px-2.5 py-2 text-left font-normal"
+			className="h-auto w-full items-center justify-start gap-2.5 rounded-lg px-2.5 py-2 text-left font-normal cursor-pointer"
 		>
 			<div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
 				<Icon className="size-3.5 text-muted-foreground" />
 			</div>
 			<div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 overflow-hidden text-left">
-				<span className="truncate text-xs font-medium text-foreground">
-					{device.name}
-				</span>
+				<div className="flex w-full items-center gap-1.5 overflow-hidden">
+					<span className="truncate text-xs font-medium text-foreground">
+						{device.name}
+					</span>
+					<Badge
+						variant="outline"
+						className={cn(
+							"h-4 shrink-0 px-1 py-0 font-mono text-[9px] uppercase tracking-wider",
+							config.badgeClass,
+						)}
+					>
+						{config.label}
+					</Badge>
+				</div>
 				<span className="truncate text-[11px] text-muted-foreground">
-					{device.metrics_summary}
+					{device.zone || "Unknown Area"} · {device.metrics_summary}
 				</span>
 			</div>
 			<Arrow className="size-3.5 shrink-0 text-muted-foreground" />
