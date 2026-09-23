@@ -8,11 +8,11 @@ import {
 	IconSparkles,
 } from "@tabler/icons-react";
 import { useForm } from "@tanstack/react-form";
-import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DashboardPage } from "@/components/layout/dashboard";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -33,8 +33,6 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useCreateExperiment } from "@/features/experiments";
 import { InquiryFormItem, type InquiryFormValues } from "@/features/inquiries";
-import type { InquiryType } from "@/features/inquiries/schemas";
-import { sensorListQueryOptions } from "@/features/sensors";
 import { getErrorMessage } from "@/lib/error";
 import { cn } from "@/lib/utils";
 
@@ -57,39 +55,15 @@ const createDraft = (): InquiryDraft => ({
 	sensorIds: [],
 });
 
-interface Suggestion {
-	question: string;
-	type: InquiryType;
-	goalGamma: string;
-	keywords: string[];
-}
-
-const SUGGESTIONS: Suggestion[] = [
-	{
-		question:
-			"How much energy do kitchen appliances consume during peak hours?",
-		type: "appliance",
-		goalGamma: "Optimize kitchen appliance usage schedule",
-		keywords: ["microwave", "fridge", "kitchen", "plug"],
-	},
-	{
-		question: "Is the meeting room equipment or AC left running after hours?",
-		type: "fact",
-		goalGamma: "Reduce standby energy in shared meeting spaces",
-		keywords: ["tv", "meeting", "climate", "air", "plug"],
-	},
-];
-
 /**
  * Wizard tạo experiment 2 bước:
  *  - Bước 1: cấu hình chung (title, asking window, giới hạn hỏi).
- *  - Bước 2: danh sách inquiries + bộ chọn cảm biến, gợi ý AI
+ *  - Bước 2: danh sách inquiries + bộ chọn cảm biến (khối gợi ý AI tạm thời static)
  *    và submit trọn gói qua `useCreateExperiment`.
  */
 export const NewExperimentWizard = () => {
 	const navigate = useNavigate();
 	const createExperiment = useCreateExperiment();
-	const { data: sensors = [] } = useQuery(sensorListQueryOptions());
 	const [step, setStep] = useState<1 | 2>(1);
 	const [serverError, setServerError] = useState<string | null>(null);
 	const [inquiries, setInquiries] = useState<InquiryDraft[]>(() => [
@@ -124,37 +98,6 @@ export const NewExperimentWizard = () => {
 	const addInquiry = useCallback(() => {
 		setInquiries((prev) => [...prev, createDraft()]);
 	}, []);
-
-	/** "Suggest with AI": điền inquiry mẫu và tự chọn sensor khớp keyword thực tế trong nhà. */
-	const suggestWithAI = () => {
-		// Tự động điền title nếu chưa có
-		if (!form.state.values.title.trim()) {
-			form.setFieldValue("title", "Smart Home Energy & Appliance Study");
-		}
-
-		const suggested = SUGGESTIONS.map((suggestion) => {
-			const matchedIds = sensors
-				.filter((sensor) =>
-					suggestion.keywords.some(
-						(keyword) =>
-							sensor.name.toLowerCase().includes(keyword) ||
-							(sensor.appliance_name ?? "").toLowerCase().includes(keyword) ||
-							sensor.source_key.toLowerCase().includes(keyword) ||
-							(sensor.zone ?? "").toLowerCase().includes(keyword),
-					),
-				)
-				.map((sensor) => sensor.id);
-			return {
-				id: crypto.randomUUID(),
-				question: suggestion.question,
-				type: suggestion.type,
-				goalGamma: suggestion.goalGamma,
-				sensorIds: matchedIds,
-			};
-		});
-		setInquiries(suggested);
-		toast.success("AI suggested 2 sample inquiries mapped to active sensors!");
-	};
 
 	const handleContinueToStep2 = () => {
 		const title = form.state.values.title.trim();
@@ -221,7 +164,7 @@ export const NewExperimentWizard = () => {
 					>
 						<Card>
 							<CardHeader>
-								<CardTitle>General Parameters</CardTitle>
+								<CardTitle>General Configuration</CardTitle>
 								<CardDescription>
 									Set up the active inquiry window and interrogation constraints
 									for this study.
@@ -380,23 +323,33 @@ export const NewExperimentWizard = () => {
 					</form>
 				) : (
 					<div className="flex flex-col gap-6">
-						<Card size="sm">
+						<Card size="sm" className="border-dashed bg-muted/30">
 							<CardContent className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-								<div className="flex items-center gap-2.5">
-									<IconSparkles className="size-4.5 shrink-0 text-primary" />
-									<span className="text-sm text-muted-foreground">
-										Auto-generate sample inquiries and map relevant sensors from
-										your connected devices.
-									</span>
+								<div className="flex items-center gap-3">
+									<div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+										<IconSparkles className="size-4" />
+									</div>
+									<div className="flex flex-col gap-0.5">
+										<div className="flex items-center gap-2">
+											<span className="text-sm font-medium text-foreground">
+												Auto-generate inquiries
+											</span>
+											<Badge variant="secondary">Coming soon</Badge>
+										</div>
+										<p className="text-xs text-muted-foreground">
+											Auto-generate sample inquiries and map relevant sensors
+											from your connected devices.
+										</p>
+									</div>
 								</div>
 								<Button
 									type="button"
 									variant="outline"
 									size="sm"
-									onClick={suggestWithAI}
-									className="shrink-0 gap-1.5"
+									disabled
+									className="shrink-0"
 								>
-									<IconSparkles className="size-3.5 text-primary" />
+									<IconSparkles data-icon="inline-start" />
 									Suggest inquiries
 								</Button>
 							</CardContent>

@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { NestedErrorFallback } from "@/components/common/error-pages/error-fallback";
 import { experimentDetailQueryOptions } from "@/features/experiments";
 import { ExperimentSidebarNav } from "./-components/experiment-sidebar-nav";
 
@@ -18,5 +19,6 @@ export const Route = createFileRoute(
 			experimentDetailQueryOptions(params.experimentId),
 		);
 	},
+	errorComponent: NestedErrorFallback,
 	component: () => <Outlet />,
 });

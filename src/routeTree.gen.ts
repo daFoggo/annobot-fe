@@ -22,6 +22,7 @@ import { Route as DashboardDashboardExperimentsIndexRouteImport } from './routes
 import { Route as DashboardDashboardExperimentsExperimentIdRouteRouteImport } from './routes/_dashboard/dashboard/experiments/$experimentId/route'
 import { Route as DashboardDashboardExperimentsNewRouteImport } from './routes/_dashboard/dashboard/experiments/new'
 import { Route as DashboardDashboardExperimentsExperimentIdIndexRouteImport } from './routes/_dashboard/dashboard/experiments/$experimentId/index'
+import { Route as DashboardDashboardExperimentsExperimentIdCasesRouteImport } from './routes/_dashboard/dashboard/experiments/$experimentId/cases'
 import { Route as DashboardDashboardExperimentsExperimentIdInquiriesRouteImport } from './routes/_dashboard/dashboard/experiments/$experimentId/inquiries'
 import { Route as DashboardDashboardExperimentsExperimentIdSettingsRouteImport } from './routes/_dashboard/dashboard/experiments/$experimentId/settings'
 
@@ -94,6 +95,12 @@ const DashboardDashboardExperimentsExperimentIdIndexRoute =
     path: '/',
     getParentRoute: () => DashboardDashboardExperimentsExperimentIdRouteRoute,
   } as any)
+const DashboardDashboardExperimentsExperimentIdCasesRoute =
+  DashboardDashboardExperimentsExperimentIdCasesRouteImport.update({
+    id: '/cases',
+    path: '/cases',
+    getParentRoute: () => DashboardDashboardExperimentsExperimentIdRouteRoute,
+  } as any)
 const DashboardDashboardExperimentsExperimentIdInquiriesRoute =
   DashboardDashboardExperimentsExperimentIdInquiriesRouteImport.update({
     id: '/inquiries',
@@ -119,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/experiments/new': typeof DashboardDashboardExperimentsNewRoute
   '/dashboard/devices/': typeof DashboardDashboardDevicesIndexRoute
   '/dashboard/experiments/': typeof DashboardDashboardExperimentsIndexRoute
+  '/dashboard/experiments/$experimentId/cases': typeof DashboardDashboardExperimentsExperimentIdCasesRoute
   '/dashboard/experiments/$experimentId/inquiries': typeof DashboardDashboardExperimentsExperimentIdInquiriesRoute
   '/dashboard/experiments/$experimentId/settings': typeof DashboardDashboardExperimentsExperimentIdSettingsRoute
   '/dashboard/experiments/$experimentId/': typeof DashboardDashboardExperimentsExperimentIdIndexRoute
@@ -132,6 +140,7 @@ export interface FileRoutesByTo {
   '/dashboard/experiments/new': typeof DashboardDashboardExperimentsNewRoute
   '/dashboard/devices': typeof DashboardDashboardDevicesIndexRoute
   '/dashboard/experiments': typeof DashboardDashboardExperimentsIndexRoute
+  '/dashboard/experiments/$experimentId/cases': typeof DashboardDashboardExperimentsExperimentIdCasesRoute
   '/dashboard/experiments/$experimentId/inquiries': typeof DashboardDashboardExperimentsExperimentIdInquiriesRoute
   '/dashboard/experiments/$experimentId/settings': typeof DashboardDashboardExperimentsExperimentIdSettingsRoute
   '/dashboard/experiments/$experimentId': typeof DashboardDashboardExperimentsExperimentIdIndexRoute
@@ -150,6 +159,7 @@ export interface FileRoutesById {
   '/_dashboard/dashboard/experiments/new': typeof DashboardDashboardExperimentsNewRoute
   '/_dashboard/dashboard/devices/': typeof DashboardDashboardDevicesIndexRoute
   '/_dashboard/dashboard/experiments/': typeof DashboardDashboardExperimentsIndexRoute
+  '/_dashboard/dashboard/experiments/$experimentId/cases': typeof DashboardDashboardExperimentsExperimentIdCasesRoute
   '/_dashboard/dashboard/experiments/$experimentId/inquiries': typeof DashboardDashboardExperimentsExperimentIdInquiriesRoute
   '/_dashboard/dashboard/experiments/$experimentId/settings': typeof DashboardDashboardExperimentsExperimentIdSettingsRoute
   '/_dashboard/dashboard/experiments/$experimentId/': typeof DashboardDashboardExperimentsExperimentIdIndexRoute
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/dashboard/experiments/new'
     | '/dashboard/devices/'
     | '/dashboard/experiments/'
+    | '/dashboard/experiments/$experimentId/cases'
     | '/dashboard/experiments/$experimentId/inquiries'
     | '/dashboard/experiments/$experimentId/settings'
     | '/dashboard/experiments/$experimentId/'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/dashboard/experiments/new'
     | '/dashboard/devices'
     | '/dashboard/experiments'
+    | '/dashboard/experiments/$experimentId/cases'
     | '/dashboard/experiments/$experimentId/inquiries'
     | '/dashboard/experiments/$experimentId/settings'
     | '/dashboard/experiments/$experimentId'
@@ -198,6 +210,7 @@ export interface FileRouteTypes {
     | '/_dashboard/dashboard/experiments/new'
     | '/_dashboard/dashboard/devices/'
     | '/_dashboard/dashboard/experiments/'
+    | '/_dashboard/dashboard/experiments/$experimentId/cases'
     | '/_dashboard/dashboard/experiments/$experimentId/inquiries'
     | '/_dashboard/dashboard/experiments/$experimentId/settings'
     | '/_dashboard/dashboard/experiments/$experimentId/'
@@ -302,6 +315,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardDashboardExperimentsExperimentIdIndexRouteImport
       parentRoute: typeof DashboardDashboardExperimentsExperimentIdRouteRoute
     }
+    '/_dashboard/dashboard/experiments/$experimentId/cases': {
+      id: '/_dashboard/dashboard/experiments/$experimentId/cases'
+      path: '/cases'
+      fullPath: '/dashboard/experiments/$experimentId/cases'
+      preLoaderRoute: typeof DashboardDashboardExperimentsExperimentIdCasesRouteImport
+      parentRoute: typeof DashboardDashboardExperimentsExperimentIdRouteRoute
+    }
     '/_dashboard/dashboard/experiments/$experimentId/inquiries': {
       id: '/_dashboard/dashboard/experiments/$experimentId/inquiries'
       path: '/inquiries'
@@ -320,6 +340,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardDashboardExperimentsExperimentIdRouteRouteChildren {
+  DashboardDashboardExperimentsExperimentIdCasesRoute: typeof DashboardDashboardExperimentsExperimentIdCasesRoute
   DashboardDashboardExperimentsExperimentIdInquiriesRoute: typeof DashboardDashboardExperimentsExperimentIdInquiriesRoute
   DashboardDashboardExperimentsExperimentIdSettingsRoute: typeof DashboardDashboardExperimentsExperimentIdSettingsRoute
   DashboardDashboardExperimentsExperimentIdIndexRoute: typeof DashboardDashboardExperimentsExperimentIdIndexRoute
@@ -327,6 +348,8 @@ interface DashboardDashboardExperimentsExperimentIdRouteRouteChildren {
 
 const DashboardDashboardExperimentsExperimentIdRouteRouteChildren: DashboardDashboardExperimentsExperimentIdRouteRouteChildren =
   {
+    DashboardDashboardExperimentsExperimentIdCasesRoute:
+      DashboardDashboardExperimentsExperimentIdCasesRoute,
     DashboardDashboardExperimentsExperimentIdInquiriesRoute:
       DashboardDashboardExperimentsExperimentIdInquiriesRoute,
     DashboardDashboardExperimentsExperimentIdSettingsRoute:
