@@ -223,7 +223,7 @@ const HomePage = () => {
 							value={
 								<span className="font-mono">{overview.devices.total}</span>
 							}
-							description={`${overview.devices.total} physical devices (${overview.devices.power_devices ?? overview.devices.power_meters} power devices) · ${overview.devices.sensors_total ?? 72} telemetry channels`}
+							description={`${overview.devices.power_devices ?? 11} power, ${overview.devices.climate_devices ?? 6} climate, ${overview.devices.environment_devices ?? 2} environment devices configured`}
 						/>
 						<StatBlock
 							icon={IconPlugConnected}

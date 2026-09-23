@@ -216,7 +216,7 @@ export const SensorPicker = ({ value, onChange }: SensorPickerProps) => {
 			{/* Controls: Type Filter Chips + Group By Switcher */}
 			<div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-1.5">
 				{/* Type Filter Chips */}
-				<div className="flex items-center gap-1 overflow-x-auto">
+				<div className="flex items-center gap-1">
 					{[
 						{ value: "all", label: "All" },
 						{ value: "power", label: "Power" },
