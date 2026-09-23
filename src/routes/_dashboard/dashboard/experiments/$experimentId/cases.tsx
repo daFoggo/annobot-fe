@@ -1,7 +1,7 @@
-import { IconHelp, IconPlayerPlay, IconRefresh } from "@tabler/icons-react";
+import { IconPlayerPlay } from "@tabler/icons-react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { DashboardPage } from "@/components/layout/dashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,208 +13,374 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import {
+	Pagination,
+	PaginationContent,
+	PaginationEllipsis,
+	PaginationItem,
+	PaginationLink,
+	PaginationNext,
+	PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+	Select,
+	SelectContent,
+	SelectGroup,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { getMeQueryOptions } from "@/features/auth";
+import {
+	CASES_OVERVIEW_PAGE_SIZE,
 	CasesTable,
+	CaseTimeline,
 	caseListQueryOptions,
+	durationMinutes,
+	indicatorValue,
+	median,
 	useTriggerDetection,
 } from "@/features/cases";
 import { inquiryListQueryOptions } from "@/features/inquiries";
 import { getSensorIcon } from "@/features/sensors";
+import { resolveTimezone, useTimezoneStore } from "@/stores/timezone";
+
+const ALL = "all";
+const ROWS_PER_PAGE = 10;
+
+/** Both keys optional, otherwise every `Link` to this route must pass search. */
+interface CasesSearch {
+	inquiry?: string;
+	page?: number;
+}
+
+const formatMinutes = (value: number | null) => {
+	if (value == null) return "—";
+	if (value < 60) return `${Math.round(value)} min`;
+	const hours = Math.floor(value / 60);
+	const rest = Math.round(value % 60);
+	return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+};
+
+/**
+ * Dãy số trang quanh trang hiện tại, chèn `null` ở chỗ bị cắt để render dấu ba
+ * chấm. Thiếu dấu này thì người đọc tưởng các trang ở giữa biến mất.
+ */
+const pageRange = (current: number, total: number): (number | null)[] => {
+	if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
+
+	const pages = new Set([1, total, current]);
+	for (const offset of [-1, 1]) {
+		const value = current + offset;
+		if (value > 1 && value < total) pages.add(value);
+	}
+	// Giữ đủ 5 ô số ở hai đầu để thanh không nhảy chiều rộng.
+	if (current <= 3) pages.add(2).add(3).add(4);
+	if (current >= total - 2)
+		pages
+			.add(total - 1)
+			.add(total - 2)
+			.add(total - 3);
+
+	const sorted = [...pages]
+		.filter((value) => value >= 1 && value <= total)
+		.sort((a, b) => a - b);
+	const out: (number | null)[] = [];
+	let previous = 0;
+	for (const value of sorted) {
+		if (previous && value - previous > 1) out.push(null);
+		out.push(value);
+		previous = value;
+	}
+	return out;
+};
+
+const formatEnergy = (wh: number) =>
+	wh >= 1000 ? `${(wh / 1000).toFixed(2)} kWh` : `${Math.round(wh)} Wh`;
 
 const ExperimentCasesPage = () => {
 	const { experimentId } = Route.useParams();
+	const { inquiry: inquiryParam, page = 1 } = Route.useSearch();
+	const navigate = useNavigate({ from: Route.fullPath });
+
 	const { data: inquiries } = useSuspenseQuery(
 		inquiryListQueryOptions(experimentId),
 	);
+	const { data: user } = useSuspenseQuery(getMeQueryOptions());
+	const tzChoice = useTimezoneStore((state) => state.choice);
+	const timezone = resolveTimezone(tzChoice, user?.timezone || "UTC");
 
-	const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(
-		inquiries.length > 0 ? inquiries[0].id : null,
+	const selected = inquiryParam ?? ALL;
+	const inquiryId = selected === ALL ? undefined : selected;
+
+	const activeInquiry = useMemo(
+		() => inquiries.find((item) => item.id === inquiryId) ?? null,
+		[inquiries, inquiryId],
 	);
-	const [page, setPage] = useState(1);
-	const [pageSize, setPageSize] = useState(10);
-	const [statusFilter, setStatusFilter] = useState<string | undefined>(
-		undefined,
+
+	// Câu hỏi của inquiry dài cả dòng nên tab không dùng được. Dropdown thì hợp,
+	// nhưng trigger phải là chính tiêu đề card (như select đổi loại tiêu thụ ở
+	// energy chart) thì mới đủ chỗ xuống dòng thay vì bị cắt cụt.
+	const options = useMemo(
+		() => [
+			{ value: ALL, label: "All inquiries" },
+			...inquiries.map((inquiry) => ({
+				value: inquiry.id,
+				label: inquiry.question ?? inquiry.id,
+			})),
+		],
+		[inquiries],
 	);
 
-	const activeInquiry = useMemo(() => {
-		if (!selectedInquiryId) return null;
-		return inquiries.find((i) => i.id === selectedInquiryId) ?? null;
-	}, [inquiries, selectedInquiryId]);
-
-	const { data, isLoading, isFetching } = useQuery(
+	// One request feeds the timeline, the stats and the table. Paging is local,
+	// so switching pages is instant and costs nothing.
+	const { data, isLoading } = useQuery(
 		caseListQueryOptions({
 			experiment_id: experimentId,
-			inquiry_id: selectedInquiryId || undefined,
-			status: statusFilter || undefined,
-			page,
-			page_size: pageSize,
+			inquiry_id: inquiryId,
+			page: 1,
+			page_size: CASES_OVERVIEW_PAGE_SIZE,
 		}),
 	);
 
-	const triggerMutation = useTriggerDetection(experimentId);
+	const triggerDetection = useTriggerDetection(experimentId);
+	const cases = useMemo(() => data?.founds ?? [], [data]);
+	const total = data?.total_count ?? 0;
+	const truncated = total > CASES_OVERVIEW_PAGE_SIZE;
 
-	const handleInquiryChange = (id: string | null) => {
-		setSelectedInquiryId(id);
-		setPage(1);
+	const stats = useMemo(() => {
+		const durations = cases
+			.map(durationMinutes)
+			.filter((value): value is number => value != null);
+		const energy = cases.reduce((sum, item) => {
+			const value =
+				indicatorValue(item, "energy_wh") ??
+				(item.evidence?.energy_wh_integrated as number | undefined) ??
+				0;
+			return sum + value;
+		}, 0);
+		const annotated = cases.filter((item) =>
+			["answered", "annotated", "complete"].includes(item.status),
+		).length;
+		return {
+			cases: cases.length,
+			medianDuration: median(durations),
+			energy,
+			annotated,
+		};
+	}, [cases]);
+
+	const pageCount = Math.max(Math.ceil(cases.length / ROWS_PER_PAGE), 1);
+	const current = Math.min(Math.max(page, 1), pageCount);
+	const rows = cases.slice(
+		(current - 1) * ROWS_PER_PAGE,
+		current * ROWS_PER_PAGE,
+	);
+
+	// PaginationLink renders a real anchor, so each page gets a real href
+	// (middle-click, open in new tab) and the click is intercepted for SPA nav.
+	const pageHref = (value: number) => {
+		const params = new URLSearchParams();
+		if (inquiryId) params.set("inquiry", inquiryId);
+		if (value > 1) params.set("page", String(value));
+		const query = params.toString();
+		return `/dashboard/experiments/${experimentId}/cases${query ? `?${query}` : ""}`;
 	};
 
-	const handleStatusFilterChange = (status?: string) => {
-		setStatusFilter(status);
-		setPage(1);
+	const goToPage = (event: React.MouseEvent, value: number) => {
+		event.preventDefault();
+		navigate({
+			search: (): CasesSearch => ({
+				inquiry: inquiryId,
+				page: value > 1 ? value : undefined,
+			}),
+		});
 	};
-
-	const handlePageSizeChange = (newPageSize: number) => {
-		setPageSize(newPageSize);
-		setPage(1);
-	};
-
-	const handleTriggerDetection = () => {
-		triggerMutation.mutate(selectedInquiryId || undefined);
-	};
-
-	const cases = data?.founds ?? [];
-	const totalCount = data?.total_count ?? 0;
 
 	return (
 		<DashboardPage
-			title="Cycles & Episodes (Cases)"
-			description="Quan sát các chu kỳ hoạt động và sự kiện thực tế được phát hiện từ cảm biến theo từng câu hỏi Inquiry."
+			title="Cases"
+			description="Every case is one device run, bounded by the detection engine from the power trace."
 			actions={
-				<div className="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={triggerMutation.isPending || isFetching}
-						onClick={handleTriggerDetection}
-					>
-						{triggerMutation.isPending ? (
-							<IconRefresh className="size-4 animate-spin mr-1.5" />
-						) : (
-							<IconPlayerPlay className="size-4 mr-1.5 text-primary" />
-						)}
-						{selectedInquiryId
-							? "Quét lại Inquiry này"
-							: "Quét lại toàn bộ (Detect Now)"}
-					</Button>
-				</div>
+				<Button
+					variant="outline"
+					size="sm"
+					disabled={triggerDetection.isPending}
+					onClick={() => triggerDetection.mutate(inquiryId)}
+				>
+					{triggerDetection.isPending ? (
+						<Spinner data-icon="inline-start" />
+					) : (
+						<IconPlayerPlay data-icon="inline-start" />
+					)}
+					{activeInquiry ? "Run for this inquiry" : "Run detection"}
+				</Button>
 			}
 		>
-			<div className="flex flex-col gap-6">
-				{/* Inquiry Selector Tabs */}
-				<div className="flex flex-wrap items-center gap-2 border-b pb-3">
-					<Button
-						variant={selectedInquiryId === null ? "default" : "outline"}
-						size="sm"
-						className="h-8 rounded-full text-xs"
-						onClick={() => handleInquiryChange(null)}
-					>
-						Tất cả Inquiries
-					</Button>
-					{inquiries.map((inq, idx) => {
-						const isSelected = selectedInquiryId === inq.id;
-						return (
-							<Button
-								key={inq.id}
-								variant={isSelected ? "default" : "outline"}
-								size="sm"
-								className="h-8 rounded-full text-xs gap-1.5 max-w-[280px] truncate"
-								onClick={() => handleInquiryChange(inq.id)}
-								title={inq.question ?? undefined}
-							>
-								<span className="font-mono font-semibold">#{idx + 1}</span>
-								<span className="truncate">{inq.question}</span>
-							</Button>
-						);
-					})}
-				</div>
-
-				{/* Active Inquiry Context Card */}
-				{activeInquiry && (
-					<Card className="shadow-xs bg-muted/20 border-muted">
-						<CardHeader className="py-3 px-4">
-							<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-								<div className="flex items-center gap-2">
-									<div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-										<IconHelp className="size-4" />
-									</div>
-									<CardTitle className="text-sm font-semibold">
-										{activeInquiry.question}
-									</CardTitle>
-								</div>
-								{activeInquiry.type && (
-									<Badge
-										variant="outline"
-										className="w-fit text-[11px] uppercase"
-									>
-										{activeInquiry.type}
+			<div className="flex flex-col gap-4">
+				<Card>
+					<CardHeader>
+						<Select
+							items={options}
+							value={selected}
+							onValueChange={(value) =>
+								navigate({
+									search: (): CasesSearch =>
+										value === ALL ? {} : { inquiry: String(value) },
+									replace: true,
+								})
+							}
+						>
+							<SelectTrigger className="h-auto w-fit max-w-full items-start whitespace-normal rounded-none border-none bg-transparent p-0 text-left text-base font-semibold tracking-tight shadow-none hover:bg-transparent focus-visible:ring-0 dark:bg-transparent dark:hover:bg-transparent *:data-[slot=select-value]:line-clamp-none [&_svg]:mt-1 [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent align="start" className="w-auto min-w-80 max-w-xl">
+								<SelectGroup>
+									{options.map((option) => (
+										<SelectItem
+											key={option.value}
+											value={option.value}
+											className="items-start whitespace-normal"
+										>
+											{option.label}
+										</SelectItem>
+									))}
+								</SelectGroup>
+							</SelectContent>
+						</Select>
+						<CardDescription className="text-xs">
+							{activeInquiry?.goal_gamma ??
+								"Cases from every inquiry in this experiment."}
+						</CardDescription>
+					</CardHeader>
+					{activeInquiry ? (
+						<CardContent className="flex flex-wrap items-center gap-1.5">
+							{activeInquiry.sensors.map((sensor) => {
+								const Icon = getSensorIcon(
+									sensor.source_key,
+									sensor.sensor_type,
+								);
+								return (
+									<Badge key={sensor.id} variant="outline">
+										<Icon data-icon="inline-start" />
+										{sensor.name || sensor.source_key}
 									</Badge>
-								)}
-							</div>
-							{activeInquiry.goal_gamma && (
-								<CardDescription className="text-xs mt-1">
-									Mục tiêu: {activeInquiry.goal_gamma}
-								</CardDescription>
-							)}
-						</CardHeader>
-						<CardContent className="pt-0 pb-3 px-4 flex flex-wrap items-center gap-3 text-xs border-t bg-card/40">
-							<div className="flex items-center gap-1.5">
-								<span className="text-muted-foreground font-medium">
-									Cảm biến ({activeInquiry.sensors.length}):
-								</span>
-								<div className="flex flex-wrap gap-1">
-									{activeInquiry.sensors.map((s) => {
-										const Icon = getSensorIcon(s.source_key, s.sensor_type);
-										return (
-											<Badge
-												key={s.id}
-												variant="secondary"
-												className="text-[11px] font-normal gap-1 py-0 px-1.5"
-											>
-												<Icon className="size-3 text-muted-foreground" />
-												{s.name || s.source_key}
-											</Badge>
-										);
-									})}
-								</div>
-							</div>
-
-							{activeInquiry.detection_rule?.type && (
-								<div className="flex items-center gap-1.5">
-									<span className="text-muted-foreground font-medium">
-										Quy tắc nhận diện:
-									</span>
-									<span className="font-mono font-semibold text-primary">
-										{activeInquiry.detection_rule.type}
-									</span>
-								</div>
-							)}
+								);
+							})}
+							{activeInquiry.detection_rule?.type ? (
+								<Badge variant="secondary">
+									{String(activeInquiry.detection_rule.type)}
+								</Badge>
+							) : null}
 						</CardContent>
-					</Card>
-				)}
+					) : null}
+				</Card>
 
-				{/* Cases Table */}
-				<CasesTable
-					cases={cases}
-					totalCount={totalCount}
-					page={page}
-					pageSize={pageSize}
-					onPageChange={setPage}
-					onPageSizeChange={handlePageSizeChange}
-					statusFilter={statusFilter}
-					onStatusFilterChange={handleStatusFilterChange}
-					activeInquiry={activeInquiry}
-					isLoading={isLoading}
-					isFetching={isFetching}
-				/>
+				<Card>
+					<CardContent>
+						<dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+							<Tile label="Cases" value={String(stats.cases)} />
+							<Tile
+								label="Median duration"
+								value={formatMinutes(stats.medianDuration)}
+							/>
+							<Tile label="Energy" value={formatEnergy(stats.energy)} />
+							<Tile
+								label="Annotated"
+								value={`${stats.annotated} / ${stats.cases}`}
+							/>
+						</dl>
+					</CardContent>
+				</Card>
+
+				<CaseTimeline cases={cases} timezone={timezone} isLoading={isLoading} />
+
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-sm">Detail</CardTitle>
+						<CardDescription className="text-xs">
+							{truncated
+								? `Showing the ${CASES_OVERVIEW_PAGE_SIZE} most recent of ${total} cases.`
+								: "Open the info icon to see which thresholds bounded a case."}
+						</CardDescription>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-4">
+						<CasesTable
+							cases={rows}
+							timezone={timezone}
+							isLoading={isLoading}
+						/>
+
+						{pageCount > 1 ? (
+							<Pagination>
+								<PaginationContent>
+									<PaginationItem>
+										<PaginationPrevious
+											href={pageHref(Math.max(current - 1, 1))}
+											aria-disabled={current <= 1}
+											onClick={(event) =>
+												goToPage(event, Math.max(current - 1, 1))
+											}
+										/>
+									</PaginationItem>
+									{pageRange(current, pageCount).map((value, index) =>
+										value == null ? (
+											<PaginationItem
+												// biome-ignore lint/suspicious/noArrayIndexKey: khoảng trống không có id riêng
+												key={`gap-${index}`}
+											>
+												<PaginationEllipsis />
+											</PaginationItem>
+										) : (
+											<PaginationItem key={value}>
+												<PaginationLink
+													href={pageHref(value)}
+													isActive={value === current}
+													onClick={(event) => goToPage(event, value)}
+												>
+													{value}
+												</PaginationLink>
+											</PaginationItem>
+										),
+									)}
+									<PaginationItem>
+										<PaginationNext
+											href={pageHref(Math.min(current + 1, pageCount))}
+											aria-disabled={current >= pageCount}
+											onClick={(event) =>
+												goToPage(event, Math.min(current + 1, pageCount))
+											}
+										/>
+									</PaginationItem>
+								</PaginationContent>
+							</Pagination>
+						) : null}
+					</CardContent>
+				</Card>
 			</div>
 		</DashboardPage>
 	);
 };
 
+const Tile = ({ label, value }: { label: string; value: string }) => (
+	<div className="flex flex-col gap-0.5">
+		<dt className="text-xs text-muted-foreground">{label}</dt>
+		<dd className="font-mono text-lg font-semibold tabular-nums">{value}</dd>
+	</div>
+);
+
 export const Route = createFileRoute(
 	"/_dashboard/dashboard/experiments/$experimentId/cases",
 )({
 	staticData: {
-		breadcrumb: { label: "Cycles / Cases" },
+		breadcrumb: { label: "Cases" },
+	},
+	validateSearch: (search: Record<string, unknown>): CasesSearch => {
+		const next: CasesSearch = {};
+		if (typeof search.inquiry === "string") next.inquiry = search.inquiry;
+		const page = Number(search.page);
+		if (Number.isInteger(page) && page > 1) next.page = page;
+		return next;
 	},
 	loader: async ({ context, params }) => {
 		await context.queryClient.query(

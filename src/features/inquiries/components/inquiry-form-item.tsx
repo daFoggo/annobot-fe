@@ -84,7 +84,7 @@ export const InquiryFormItem = ({
 				<div className="grid gap-4 sm:grid-cols-[1fr_12rem]">
 					<Field>
 						<FieldLabel htmlFor={`inquiry-${index}-question`}>
-							Question (Q) <span className="text-destructive">*</span>
+							Question <span className="text-destructive">*</span>
 						</FieldLabel>
 						<Input
 							id={`inquiry-${index}-question`}
@@ -123,7 +123,7 @@ export const InquiryFormItem = ({
 
 				<Field>
 					<FieldLabel htmlFor={`inquiry-${index}-goal`}>
-						Operational goal (Γ)
+						Operational Goal
 					</FieldLabel>
 					<Input
 						id={`inquiry-${index}-goal`}
@@ -138,7 +138,7 @@ export const InquiryFormItem = ({
 
 				<Field>
 					<div className="flex items-center justify-between pb-1">
-						<FieldLabel>Assigned Devices (S)</FieldLabel>
+						<FieldLabel>Assigned Devices / Sensors</FieldLabel>
 						<span className="text-xs text-muted-foreground">
 							{values.sensorIds.length} selected
 						</span>

@@ -23,17 +23,17 @@ export const ProductMenuNav = ({ groups }: ProductMenuNavProps) => {
 	const pathname = usePathname();
 
 	return (
-		<div className="flex flex-col gap-4 py-4">
+		<div className="flex flex-col gap-4 py-2">
 			{groups.map((group, index) => (
 				<Fragment key={group.key}>
-					{index > 0 ? <ProductMenuSeparator className="mx-3" /> : null}
-					<div className="flex flex-col gap-1 px-3">
+					{index > 0 ? <ProductMenuSeparator className="mx-2" /> : null}
+					<div className="flex flex-col gap-1 px-2">
 						{group.title ? (
 							<div className="px-2 py-1 font-mono text-xs tracking-wide text-muted-foreground uppercase">
 								{group.title}
 							</div>
 						) : null}
-						<SidebarMenu className="gap-0.5">
+						<SidebarMenu className="gap-1">
 							{group.items.map((item) => (
 								<SidebarMenuItem key={item.to}>
 									<SidebarMenuButton

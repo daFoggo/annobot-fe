@@ -73,9 +73,9 @@ export const NewExperimentWizard = () => {
 	const form = useForm({
 		defaultValues: {
 			title: "",
-			ask_window_start: "09:00",
-			ask_window_end: "21:00",
-			max_asks_per_day: "10",
+			il_ask_window_start: "09:00",
+			il_ask_window_end: "21:00",
+			il_max_asks_per_day: "10",
 			il_timestep_minutes: "30",
 		},
 	});
@@ -121,10 +121,15 @@ export const NewExperimentWizard = () => {
 		try {
 			const experiment = await createExperiment.mutateAsync({
 				title,
-				ask_window_start: form.state.values.ask_window_start,
-				ask_window_end: form.state.values.ask_window_end,
-				max_asks_per_day: toIntOrNull(form.state.values.max_asks_per_day),
-				il_timestep_minutes: toIntOrNull(form.state.values.il_timestep_minutes),
+				service: "default",
+				service_type: "temporary",
+				starts_at: new Date(Date.now() - 7 * 86400000).toISOString(),
+				ends_at: new Date(Date.now() + 86400000).toISOString(),
+				il_ask_window_start: form.state.values.il_ask_window_start,
+				il_max_asks_per_day:
+					toIntOrNull(form.state.values.il_max_asks_per_day) ?? 10,
+				il_timestep_minutes:
+					toIntOrNull(form.state.values.il_timestep_minutes) ?? 30,
 				inquiries: inquiries.map((inquiry) => ({
 					question: inquiry.question.trim(),
 					sensor_ids: inquiry.sensorIds,
@@ -213,7 +218,7 @@ export const NewExperimentWizard = () => {
 										<FieldLabel>Asking Window (Daily Hours)</FieldLabel>
 										<div className="grid grid-cols-2 gap-4">
 											<form.Field
-												name="ask_window_start"
+												name="il_ask_window_start"
 												children={(field) => (
 													<Field>
 														<FieldLabel
@@ -234,7 +239,7 @@ export const NewExperimentWizard = () => {
 												)}
 											/>
 											<form.Field
-												name="ask_window_end"
+												name="il_ask_window_end"
 												children={(field) => (
 													<Field>
 														<FieldLabel
@@ -263,7 +268,7 @@ export const NewExperimentWizard = () => {
 
 									<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
 										<form.Field
-											name="max_asks_per_day"
+											name="il_max_asks_per_day"
 											children={(field) => (
 												<Field>
 													<FieldLabel htmlFor={field.name}>
@@ -279,7 +284,8 @@ export const NewExperimentWizard = () => {
 														}
 													/>
 													<FieldDescription>
-														Daily cap on total interactions.
+														Daily cap on total interactions. (Defaults to 10 if
+														empty)
 													</FieldDescription>
 												</Field>
 											)}
@@ -301,7 +307,8 @@ export const NewExperimentWizard = () => {
 														}
 													/>
 													<FieldDescription>
-														Minimum cooldown time between prompts.
+														Minimum cooldown time between prompts. (Defaults to
+														30 min if empty)
 													</FieldDescription>
 												</Field>
 											)}

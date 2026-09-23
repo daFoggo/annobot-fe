@@ -1,14 +1,12 @@
 import {
 	IconArrowRight,
-	IconCalendarTime,
-	IconClock,
-	IconCpu,
-	IconHelp,
-	IconPlus,
+	IconHelpCircle,
+	IconPlayerPlay,
 	IconSettings,
 } from "@tabler/icons-react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMemo } from "react";
 import { DashboardPage } from "@/components/layout/dashboard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,279 +25,281 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemSeparator,
+	ItemTitle,
+} from "@/components/ui/item";
+import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
+import { getMeQueryOptions } from "@/features/auth";
+import {
+	CASES_OVERVIEW_PAGE_SIZE,
+	CaseFunnel,
+	CaseTimeline,
+	caseListQueryOptions,
+	countByStage,
+	useTriggerDetection,
+} from "@/features/cases";
 import { experimentDetailQueryOptions } from "@/features/experiments";
 import { inquiryListQueryOptions } from "@/features/inquiries";
-import { getSensorIcon } from "@/features/sensors";
+import { resolveTimezone, useTimezoneStore } from "@/stores/timezone";
 
-const time = (value: string) => value.slice(0, 5);
+const day = (value: string | null | undefined) =>
+	value ? new Date(value).toLocaleDateString("en-GB") : null;
+
+const DAY_MS = 86_400_000;
+
+/**
+ * Chu kỳ lắng nghe `T` của experiment: khoảng thời gian nó được phép thu dữ
+ * liệu. Đây là **thời gian trôi qua**, không phải tiến độ công việc — thanh bar
+ * chạy kể cả khi không có case nào được nhận diện, nên nhãn phải nói rõ điều đó.
+ */
+interface Period {
+	state: "scheduled" | "running" | "ended";
+	elapsedDays: number;
+	totalDays: number;
+	remainingDays: number;
+	percent: number;
+}
+
+const readPeriod = (
+	start?: string | null,
+	end?: string | null,
+): Period | null => {
+	if (!start || !end) return null;
+	const from = new Date(start).getTime();
+	const to = new Date(end).getTime();
+	if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return null;
+
+	const now = Date.now();
+	const totalDays = Math.max(Math.round((to - from) / DAY_MS), 1);
+	const elapsedMs = Math.min(Math.max(now - from, 0), to - from);
+	const elapsedDays = Math.min(
+		Math.max(Math.ceil(elapsedMs / DAY_MS), 0),
+		totalDays,
+	);
+
+	return {
+		state: now < from ? "scheduled" : now > to ? "ended" : "running",
+		elapsedDays,
+		totalDays,
+		remainingDays: Math.max(totalDays - elapsedDays, 0),
+		percent: (elapsedMs / (to - from)) * 100,
+	};
+};
+
+const PERIOD_LABEL: Record<Period["state"], string> = {
+	scheduled: "Not started",
+	running: "Running",
+	ended: "Ended",
+};
 
 const ExperimentOverviewPage = () => {
 	const { experimentId } = Route.useParams();
 	const { data: experiment } = useSuspenseQuery(
 		experimentDetailQueryOptions(experimentId),
 	);
+	const { data: user } = useSuspenseQuery(getMeQueryOptions());
+	const tzChoice = useTimezoneStore((state) => state.choice);
+	const timezone = resolveTimezone(tzChoice, user?.timezone || "UTC");
+
 	const { data: inquiries = [] } = useQuery(
 		inquiryListQueryOptions(experimentId),
 	);
+	const { data, isLoading } = useQuery(
+		caseListQueryOptions({
+			experiment_id: experimentId,
+			page: 1,
+			page_size: CASES_OVERVIEW_PAGE_SIZE,
+		}),
+	);
+	const triggerDetection = useTriggerDetection(experimentId);
 
-	const uniqueSensorsCount = new Set(
-		inquiries.flatMap((inquiry) => inquiry.sensors.map((sensor) => sensor.id)),
-	).size;
+	const cases = useMemo(() => data?.founds ?? [], [data]);
+	const byInquiry = useMemo(() => {
+		const map = new Map<string, typeof cases>();
+		for (const item of cases) {
+			const list = map.get(item.inquiry_id);
+			if (list) list.push(item);
+			else map.set(item.inquiry_id, [item]);
+		}
+		return map;
+	}, [cases]);
+
+	const period = readPeriod(experiment.starts_at, experiment.ends_at);
+	const from = day(experiment.starts_at);
+	const to = day(experiment.ends_at);
 
 	return (
 		<DashboardPage
 			title={experiment.title}
-			description="Experiment overview, scheduled inquiry window, and monitored sensors."
+			description={
+				from && to
+					? `Listening period ${from} to ${to}`
+					: "No listening period set for this experiment."
+			}
 			actions={
 				<div className="flex items-center gap-2">
 					<Button
 						variant="outline"
 						size="sm"
-						render={
-							<Link
-								to="/dashboard/experiments/$experimentId/settings"
-								params={{ experimentId }}
-							/>
-						}
+						disabled={triggerDetection.isPending}
+						onClick={() => triggerDetection.mutate(undefined)}
 					>
-						<IconSettings className="size-4" />
-						Settings
+						{triggerDetection.isPending ? (
+							<Spinner data-icon="inline-start" />
+						) : (
+							<IconPlayerPlay data-icon="inline-start" />
+						)}
+						Run detection
 					</Button>
 					<Button
 						size="sm"
 						render={
 							<Link
-								to="/dashboard/experiments/$experimentId/inquiries"
+								to="/dashboard/experiments/$experimentId/setup"
 								params={{ experimentId }}
 							/>
 						}
 					>
-						<IconPlus className="size-4" />
-						Add Inquiry
+						<IconSettings data-icon="inline-start" />
+						Setup
 					</Button>
 				</div>
 			}
 		>
-			<div className="flex flex-col gap-6">
-				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					<Card className="shadow-xs">
-						<CardHeader className="flex flex-row items-center justify-between pb-2">
-							<CardDescription className="font-medium text-xs">
-								Inquiries
-							</CardDescription>
-							<div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-								<IconHelp className="size-4" />
-							</div>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">{inquiries.length}</div>
-							<p className="text-xs text-muted-foreground mt-1">
-								Active questions configured
-							</p>
-						</CardContent>
-					</Card>
-
-					<Card className="shadow-xs">
-						<CardHeader className="flex flex-row items-center justify-between pb-2">
-							<CardDescription className="font-medium text-xs">
-								Assigned Sensors
-							</CardDescription>
-							<div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-								<IconCpu className="size-4" />
-							</div>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">{uniqueSensorsCount}</div>
-							<p className="text-xs text-muted-foreground mt-1">
-								Distinct hardware feeds
-							</p>
-						</CardContent>
-					</Card>
-
-					<Card className="shadow-xs">
-						<CardHeader className="flex flex-row items-center justify-between pb-2">
-							<CardDescription className="font-medium text-xs">
-								Ask Window
-							</CardDescription>
-							<div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-								<IconClock className="size-4" />
-							</div>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">
-								{time(experiment.ask_window_start)} –{" "}
-								{time(experiment.ask_window_end)}
-							</div>
-							<p className="text-xs text-muted-foreground mt-1">
-								Daily prompt schedule
-							</p>
-						</CardContent>
-					</Card>
-
-					<Card className="shadow-xs">
-						<CardHeader className="flex flex-row items-center justify-between pb-2">
-							<CardDescription className="font-medium text-xs">
-								Cadence & Quota
-							</CardDescription>
-							<div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-								<IconCalendarTime className="size-4" />
-							</div>
-						</CardHeader>
-						<CardContent>
-							<div className="text-2xl font-bold">
-								{experiment.il_timestep_minutes ?? 30}m
-							</div>
-							<p className="text-xs text-muted-foreground mt-1">
-								Max {experiment.max_asks_per_day ?? "—"} asks/day
-							</p>
-						</CardContent>
-					</Card>
-				</div>
-
-				<div className="flex flex-col gap-4">
-					<div className="flex items-center justify-between">
-						<div>
-							<h3 className="text-base font-semibold">Configured Inquiries</h3>
-							<p className="text-xs text-muted-foreground">
-								Target questions and services evaluated during this experiment.
-							</p>
-						</div>
-						{inquiries.length > 0 ? (
-							<Button
-								variant="ghost"
-								size="sm"
-								className="gap-1.5 text-xs text-primary"
-								render={
-									<Link
-										to="/dashboard/experiments/$experimentId/inquiries"
-										params={{ experimentId }}
-									/>
-								}
-							>
-								View all in inquiries tab
-								<IconArrowRight className="size-3.5" />
-							</Button>
-						) : null}
-					</div>
-
-					{inquiries.length === 0 ? (
-						<Empty className="border bg-card shadow-xs">
-							<EmptyHeader>
-								<EmptyMedia variant="icon">
-									<IconHelp />
-								</EmptyMedia>
-								<EmptyTitle>No inquiries added yet</EmptyTitle>
-								<EmptyDescription>
-									Add questions and bind device sensors to begin tracking and
-									annotating episodes.
-								</EmptyDescription>
-							</EmptyHeader>
-							<EmptyContent>
-								<Button
-									render={
-										<Link
-											to="/dashboard/experiments/$experimentId/inquiries"
-											params={{ experimentId }}
-										/>
-									}
+			<div className="flex flex-col gap-4">
+				{period ? (
+					<Card>
+						<CardHeader>
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<CardTitle className="text-sm">Listening period</CardTitle>
+								<Badge
+									variant={period.state === "running" ? "default" : "secondary"}
 								>
-									<IconPlus className="size-4" />
-									Configure Inquiries
-								</Button>
-							</EmptyContent>
-						</Empty>
-					) : (
-						<div className="grid gap-3 sm:grid-cols-2">
-							{inquiries.slice(0, 4).map((inquiry) => (
-								<Card key={inquiry.id} className="shadow-xs">
-									<CardHeader className="gap-1.5 pb-2">
-										<div className="flex items-start justify-between gap-2">
-											<span className="text-sm font-semibold leading-tight line-clamp-2">
-												{inquiry.question}
-											</span>
-											<Badge
-												variant="secondary"
-												className="shrink-0 text-[10px] capitalize"
-											>
-												{inquiry.type ?? "appliance"}
-											</Badge>
-										</div>
-										{inquiry.goal_gamma ? (
-											<p className="text-xs text-muted-foreground line-clamp-1">
-												<span className="font-medium text-foreground">
-													Goal:
-												</span>{" "}
-												{inquiry.goal_gamma}
-											</p>
-										) : null}
-									</CardHeader>
-									<CardContent className="pt-0">
-										<div className="flex flex-wrap gap-1">
-											{inquiry.sensors.length > 0 ? (
-												inquiry.sensors.slice(0, 3).map((sensor) => {
-													const Icon = getSensorIcon(
-														sensor.source_key,
-														sensor.sensor_type,
-													);
-													return (
-														<Badge
-															key={sensor.id}
-															variant="outline"
-															className="gap-1 py-0.5 text-[11px]"
-														>
-															<Icon className="size-3" />
-															<span className="max-w-28 truncate">
-																{sensor.name}
-															</span>
-														</Badge>
-													);
-												})
-											) : (
-												<span className="text-xs text-muted-foreground italic">
-													No sensors assigned
-												</span>
-											)}
-											{inquiry.sensors.length > 3 ? (
-												<Badge variant="outline" className="py-0.5 text-[11px]">
-													+{inquiry.sensors.length - 3} more
-												</Badge>
-											) : null}
-										</div>
-									</CardContent>
-								</Card>
-							))}
-						</div>
-					)}
-				</div>
+									{PERIOD_LABEL[period.state]}
+								</Badge>
+							</div>
+							<CardDescription className="text-xs">
+								Time the experiment is allowed to collect data. It is elapsed
+								time, not a measure of how much has been detected.
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="flex flex-col gap-2">
+							<Progress value={period.percent} />
+							<div className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs text-muted-foreground tabular-nums">
+								<span>
+									Day {period.elapsedDays} of {period.totalDays}
+								</span>
+								<span>
+									{period.state === "ended"
+										? "finished"
+										: period.state === "scheduled"
+											? `starts ${from}`
+											: `${period.remainingDays} days left`}
+								</span>
+							</div>
+						</CardContent>
+					</Card>
+				) : null}
 
-				<Card className="shadow-xs">
-					<CardHeader className="pb-3">
-						<CardTitle className="text-sm font-semibold">
-							Metadata & Details
-						</CardTitle>
+				<CaseFunnel cases={cases} />
+
+				<CaseTimeline cases={cases} timezone={timezone} isLoading={isLoading} />
+
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-sm">By inquiry</CardTitle>
 						<CardDescription className="text-xs">
-							Internal identifiers and timestamp history
+							Each inquiry has its own sensors and detection rule, so each
+							yields a different number of cases.
 						</CardDescription>
 					</CardHeader>
-					<CardContent className="grid gap-4 text-xs sm:grid-cols-3">
-						<div>
-							<span className="text-muted-foreground">Experiment ID</span>
-							<p className="font-mono text-foreground font-medium truncate mt-0.5">
-								{experiment.id}
-							</p>
-						</div>
-						<div>
-							<span className="text-muted-foreground">Created at</span>
-							<p className="text-foreground font-medium mt-0.5">
-								{new Date(experiment.created_at).toLocaleString()}
-							</p>
-						</div>
-						<div>
-							<span className="text-muted-foreground">Last updated</span>
-							<p className="text-foreground font-medium mt-0.5">
-								{new Date(experiment.updated_at).toLocaleString()}
-							</p>
-						</div>
+					<CardContent>
+						{inquiries.length === 0 ? (
+							<Empty>
+								<EmptyHeader>
+									<EmptyMedia variant="icon">
+										<IconHelpCircle />
+									</EmptyMedia>
+									<EmptyTitle>No inquiries yet</EmptyTitle>
+									<EmptyDescription>
+										An experiment needs at least one inquiry with sensors before
+										detection has anything to find.
+									</EmptyDescription>
+								</EmptyHeader>
+								<EmptyContent>
+									<Button
+										render={
+											<Link
+												to="/dashboard/experiments/$experimentId/setup/inquiries"
+												params={{ experimentId }}
+											/>
+										}
+									>
+										Add an inquiry
+									</Button>
+								</EmptyContent>
+							</Empty>
+						) : (
+							<ItemGroup>
+								{inquiries.map((inquiry, index) => {
+									const own = byInquiry.get(inquiry.id) ?? [];
+									const counts = countByStage(own);
+									return (
+										<div key={inquiry.id}>
+											{index > 0 ? <ItemSeparator /> : null}
+											<Item size="sm">
+												<ItemContent>
+													<ItemTitle>{inquiry.question}</ItemTitle>
+													<ItemDescription>
+														{inquiry.sensors.length === 0
+															? "No sensors bound"
+															: inquiry.sensors
+																	.map((s) => s.name || s.source_key)
+																	.join(" · ")}
+													</ItemDescription>
+													<div className="flex flex-wrap items-center gap-1.5">
+														<Badge variant="secondary">
+															{own.length} cases
+														</Badge>
+														{counts.waiting > 0 ? (
+															<Badge variant="outline">
+																{counts.waiting} awaiting
+															</Badge>
+														) : null}
+														{counts.answered > 0 ? (
+															<Badge>{counts.answered} annotated</Badge>
+														) : null}
+													</div>
+												</ItemContent>
+												<ItemActions>
+													<Button
+														variant="ghost"
+														size="sm"
+														render={
+															<Link
+																to="/dashboard/experiments/$experimentId/cases"
+																params={{ experimentId }}
+																search={{ inquiry: inquiry.id }}
+															/>
+														}
+													>
+														Cases
+														<IconArrowRight data-icon="inline-end" />
+													</Button>
+												</ItemActions>
+											</Item>
+										</div>
+									);
+								})}
+							</ItemGroup>
+						)}
 					</CardContent>
 				</Card>
 			</div>

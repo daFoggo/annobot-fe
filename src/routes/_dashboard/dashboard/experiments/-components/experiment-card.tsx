@@ -8,7 +8,8 @@ import {
 import type { Experiment } from "@/features/experiments";
 import { ExperimentIcon } from "@/features/experiments";
 
-const time = (value: string) => value.slice(0, 5);
+const time = (value: string | null | undefined) =>
+	value ? value.slice(0, 5) : "—";
 
 export interface ExperimentCardProps {
 	experiment: Experiment;
@@ -28,11 +29,11 @@ export const ExperimentCard = ({ experiment }: ExperimentCardProps) => (
 				: "No fixed question interval"}
 		</CardContent>
 		<CardFooter className="text-xs text-muted-foreground">
-			{experiment.max_asks_per_day
-				? `${experiment.max_asks_per_day} asks/day`
+			{experiment.il_max_asks_per_day
+				? `${experiment.il_max_asks_per_day} asks/day`
 				: "Unlimited asks"}{" "}
-			&middot; {time(experiment.ask_window_start)}–
-			{time(experiment.ask_window_end)}
+			&middot; {time(experiment.il_ask_window_start)}–
+			{time(experiment.il_ask_window_end)}
 		</CardFooter>
 	</Card>
 );

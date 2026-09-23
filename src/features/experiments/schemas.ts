@@ -12,10 +12,14 @@ export const ExperimentSchema = z.object({
 	id: z.string(),
 	owner_id: z.string(),
 	title: z.string(),
-	ask_window_start: z.string(),
-	ask_window_end: z.string(),
-	max_asks_per_day: z.number().int().positive().nullable(),
-	il_timestep_minutes: z.number().int().positive().nullable(),
+	service: z.string().nullable().optional(),
+	service_type: z.enum(["temporary", "permanent"]).nullable().optional(),
+	starts_at: z.string().nullable().optional(),
+	ends_at: z.string().nullable().optional(),
+	il_ask_window_start: z.string(),
+	il_ask_window_end: z.string(),
+	il_max_asks_per_day: z.number().int().nullable(),
+	il_timestep_minutes: z.number().int().nullable(),
 	created_at: z.string(),
 	updated_at: z.string(),
 	inquiries: z.array(InquirySchema).default([]),
@@ -65,20 +69,37 @@ export type InquiryNestedCreateInput = z.infer<
 
 /**
  * Payload tạo experiment (`POST /experiments`). Chỉ `title` là bắt buộc; các
- * trường còn lại để backend áp default khi bỏ trống.
+ * trường còn lại backend áp default khi bị trống. Backend đổi tên
+ * `ask_window_*` → `il_ask_window_*` và thêm `service`/`service_type`/
+ * `starts_at`/`ends_at` (bắt buộc ở DB) — nên FE khai default để payload luôn
+ * hợp lệ.
  */
 export const ExperimentCreateSchema = z.object({
 	title: z.string().min(1).max(256),
-	ask_window_start: TimeStringSchema.optional(),
-	ask_window_end: TimeStringSchema.optional(),
-	max_asks_per_day: z.number().int().min(1).nullable().optional(),
+	service: z.string().min(1).default("default"),
+	service_type: z.enum(["temporary", "permanent"]).default("temporary"),
+	starts_at: z
+		.string()
+		.default(() => new Date(Date.now() - 7 * 86400000).toISOString()),
+	ends_at: z
+		.string()
+		.default(() => new Date(Date.now() + 86400000).toISOString()),
+	il_ask_window_start: TimeStringSchema.optional(),
+	il_ask_window_end: TimeStringSchema.optional(),
+	il_max_asks_per_day: z.number().int().min(1).nullable().optional(),
 	il_timestep_minutes: z.number().int().min(1).nullable().optional(),
 	inquiries: z.array(InquiryNestedCreateSchema).optional(),
 });
 
 export type ExperimentCreateInput = z.infer<typeof ExperimentCreateSchema>;
 
-/** Payload cập nhật experiment (`PATCH /experiments/{id}`) — mọi trường optional. */
-export const ExperimentUpdateSchema = ExperimentCreateSchema.partial();
+/** Payload cập nhật experiment (`PATCH /experiments/{id}`) — mỗi trường optional. */
+export const ExperimentUpdateSchema = z.object({
+	title: z.string().min(1).max(256).optional(),
+	il_ask_window_start: TimeStringSchema.optional(),
+	il_ask_window_end: TimeStringSchema.optional(),
+	il_max_asks_per_day: z.number().int().min(1).nullable().optional(),
+	il_timestep_minutes: z.number().int().min(1).nullable().optional(),
+});
 
 export type ExperimentUpdateInput = z.infer<typeof ExperimentUpdateSchema>;

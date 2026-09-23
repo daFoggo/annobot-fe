@@ -1,22 +1,29 @@
 import {
-	IconChartBar,
-	IconClock,
-	IconHelp,
+	IconLayoutDashboard,
 	IconSettings,
+	IconWaveSine,
 } from "@tabler/icons-react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useMatch } from "@tanstack/react-router";
 import { usePathname } from "@/components/layout/dashboard";
+import { Badge } from "@/components/ui/badge";
 import {
 	SidebarGroup,
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+	CASES_OVERVIEW_PAGE_SIZE,
+	caseListQueryOptions,
+} from "@/features/cases";
 
 /**
- * Nav của sidebar cấp 1 khi đang trong một experiment. Vì route có param động,
- * component tự resolve `experimentId` từ URL và truyền `params` cho `Link`
- * (thứ mà `staticData.navItems` tĩnh không biểu diễn được).
+ * Nav của một experiment, chia theo việc người dùng làm chứ không theo bảng dữ
+ * liệu: xem nó tìm được gì (Overview, Cases) và cấu hình nó (Setup).
+ *
+ * Số đếm dùng lại đúng query key mà trang Overview dùng, nên TanStack Query
+ * dedupe — nav không tạo thêm request nào.
  */
 export const ExperimentSidebarNav = () => {
 	const pathname = usePathname();
@@ -25,7 +32,19 @@ export const ExperimentSidebarNav = () => {
 		shouldThrow: false,
 	});
 	const experimentId = match?.params.experimentId ?? "";
-	const overviewPath = `/dashboard/experiments/${experimentId}`;
+	const base = `/dashboard/experiments/${experimentId}`;
+	const enabled = experimentId !== "";
+
+	const { data: cases } = useQuery({
+		...caseListQueryOptions({
+			experiment_id: experimentId,
+			page: 1,
+			page_size: CASES_OVERVIEW_PAGE_SIZE,
+		}),
+		enabled,
+	});
+
+	const inSetup = pathname.startsWith(`${base}/setup`);
 
 	return (
 		<SidebarGroup className="gap-0.5">
@@ -38,28 +57,14 @@ export const ExperimentSidebarNav = () => {
 								params={{ experimentId }}
 							/>
 						}
-						isActive={pathname === overviewPath}
+						isActive={pathname === base}
 						tooltip="Overview"
 					>
-						<IconChartBar />
+						<IconLayoutDashboard />
 						<span>Overview</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
-				<SidebarMenuItem>
-					<SidebarMenuButton
-						render={
-							<Link
-								to="/dashboard/experiments/$experimentId/inquiries"
-								params={{ experimentId }}
-							/>
-						}
-						isActive={pathname === `${overviewPath}/inquiries`}
-						tooltip="Inquiries"
-					>
-						<IconHelp />
-						<span>Inquiries</span>
-					</SidebarMenuButton>
-				</SidebarMenuItem>
+
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						render={
@@ -68,26 +73,32 @@ export const ExperimentSidebarNav = () => {
 								params={{ experimentId }}
 							/>
 						}
-						isActive={pathname === `${overviewPath}/cases`}
-						tooltip="Cycles / Cases"
+						isActive={pathname === `${base}/cases`}
+						tooltip="Cases"
 					>
-						<IconClock />
-						<span>Cycles / Cases</span>
+						<IconWaveSine />
+						<span>Cases</span>
+						{cases ? (
+							<Badge variant="secondary" className="ml-auto">
+								{cases.total_count}
+							</Badge>
+						) : null}
 					</SidebarMenuButton>
 				</SidebarMenuItem>
+
 				<SidebarMenuItem>
 					<SidebarMenuButton
 						render={
 							<Link
-								to="/dashboard/experiments/$experimentId/settings"
+								to="/dashboard/experiments/$experimentId/setup"
 								params={{ experimentId }}
 							/>
 						}
-						isActive={pathname === `${overviewPath}/settings`}
-						tooltip="Settings"
+						isActive={inSetup}
+						tooltip="Setup"
 					>
 						<IconSettings />
-						<span>Settings</span>
+						<span>Setup</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 			</SidebarMenu>

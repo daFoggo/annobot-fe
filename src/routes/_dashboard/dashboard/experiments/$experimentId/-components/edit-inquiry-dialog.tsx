@@ -29,7 +29,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { useCreateInquiry } from "@/features/inquiries";
+import { type Inquiry, useUpdateInquiry } from "@/features/inquiries";
 import type { InquiryType } from "@/features/inquiries/schemas";
 import { SensorPicker } from "@/features/sensors";
 import { getErrorMessage } from "@/lib/error";
@@ -41,46 +41,52 @@ const TYPE_OPTIONS: InquiryType[] = [
 	"custom",
 ];
 
-export interface AddInquiryDialogProps {
-	experimentId: string;
+export interface EditInquiryDialogProps {
+	inquiry: Inquiry;
 	trigger?: React.ReactElement;
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 }
 
-/**
- * Dialog thêm một inquiry mới vào experiment đã có (trang Inquiries).
- * Submit qua `useCreateInquiry`; thành công thì toast + đóng.
- * Tuân thủ shadcn Scrollable Content + Sticky Footer: Header & Footer cố định,
- * nội dung cuộn bên trong ScrollArea với hiệu ứng scroll-fade.
- */
-export const AddInquiryDialog = ({
-	experimentId,
+export const EditInquiryDialog = ({
+	inquiry,
 	trigger,
-}: AddInquiryDialogProps) => {
-	const createInquiry = useCreateInquiry();
-	const [open, setOpen] = useState(false);
+	open: controlledOpen,
+	onOpenChange: setControlledOpen,
+}: EditInquiryDialogProps) => {
+	const updateInquiry = useUpdateInquiry();
+	const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+	const isControlled = controlledOpen !== undefined;
+	const open = isControlled ? controlledOpen : uncontrolledOpen;
+	const setOpen = isControlled
+		? (setControlledOpen ?? (() => {}))
+		: setUncontrolledOpen;
+
 	const [serverError, setServerError] = useState<string | null>(null);
 
 	const form = useForm({
 		defaultValues: {
-			question: "",
-			type: "appliance" as InquiryType,
-			goalGamma: "",
-			sensorIds: [] as string[],
+			question: inquiry.question ?? "",
+			type: (inquiry.type as InquiryType) || "appliance",
+			goalGamma: inquiry.goal_gamma ?? "",
+			sensorIds: inquiry.sensors.map((s) => s.id),
 		},
 		onSubmit: async ({ value }) => {
 			setServerError(null);
 			try {
-				await createInquiry.mutateAsync({
-					experiment_id: experimentId,
-					question: value.question.trim(),
-					type: value.type,
-					goal_gamma: value.goalGamma.trim() || null,
-					sensor_ids: value.sensorIds,
+				await updateInquiry.mutateAsync({
+					id: inquiry.id,
+					payload: {
+						question: value.question.trim(),
+						type: value.type,
+						goal_gamma: value.goalGamma.trim() || null,
+						sensor_ids: value.sensorIds,
+					},
 				});
-				toast.success("Inquiry added");
+				toast.success("Inquiry updated successfully");
 				handleClose();
 			} catch (error) {
-				setServerError(getErrorMessage(error, "Could not add inquiry."));
+				setServerError(getErrorMessage(error, "Could not update inquiry."));
 			}
 		},
 	});
@@ -88,26 +94,24 @@ export const AddInquiryDialog = ({
 	const handleClose = () => {
 		setOpen(false);
 		setServerError(null);
-		createInquiry.reset();
-		form.reset();
-	};
-
-	const handleOpenChange = (nextOpen: boolean) => {
-		if (!nextOpen) {
-			handleClose();
-		} else {
-			setOpen(true);
-		}
+		updateInquiry.reset();
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={handleOpenChange}>
-			<DialogTrigger render={trigger ?? <Button>Add Inquiry</Button>} />
-			<DialogContent className=" sm:max-w-2xl">
+		<Dialog
+			open={open}
+			onOpenChange={(next) => {
+				if (!next) handleClose();
+				else setOpen(true);
+			}}
+		>
+			{trigger ? <DialogTrigger render={trigger} /> : null}
+			<DialogContent className="sm:max-w-2xl">
 				<DialogHeader>
-					<DialogTitle>Add Inquiry</DialogTitle>
+					<DialogTitle>Edit Inquiry</DialogTitle>
 					<DialogDescription>
-						Add a new inquiry to study a service in this experiment.
+						Update question wording, inquiry category, operational goals, or
+						assigned sensors.
 					</DialogDescription>
 				</DialogHeader>
 				<form
@@ -239,7 +243,7 @@ export const AddInquiryDialog = ({
 									Cancel
 								</Button>
 								<Button type="submit" disabled={!canSubmit || isSubmitting}>
-									{isSubmitting ? "Adding…" : "Add inquiry"}
+									{isSubmitting ? "Saving…" : "Save changes"}
 								</Button>
 							</DialogFooter>
 						)}
