@@ -26,12 +26,14 @@ const ExperimentCasesPage = () => {
 		inquiryListQueryOptions(experimentId),
 	);
 
-	// Mặc định chọn inquiry đầu tiên nếu có
 	const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(
 		inquiries.length > 0 ? inquiries[0].id : null,
 	);
 	const [page, setPage] = useState(1);
-	const pageSize = 10;
+	const [pageSize, setPageSize] = useState(10);
+	const [statusFilter, setStatusFilter] = useState<string | undefined>(
+		undefined,
+	);
 
 	const activeInquiry = useMemo(() => {
 		if (!selectedInquiryId) return null;
@@ -42,6 +44,7 @@ const ExperimentCasesPage = () => {
 		caseListQueryOptions({
 			experiment_id: experimentId,
 			inquiry_id: selectedInquiryId || undefined,
+			status: statusFilter || undefined,
 			page,
 			page_size: pageSize,
 		}),
@@ -51,6 +54,16 @@ const ExperimentCasesPage = () => {
 
 	const handleInquiryChange = (id: string | null) => {
 		setSelectedInquiryId(id);
+		setPage(1);
+	};
+
+	const handleStatusFilterChange = (status?: string) => {
+		setStatusFilter(status);
+		setPage(1);
+	};
+
+	const handlePageSizeChange = (newPageSize: number) => {
+		setPageSize(newPageSize);
 		setPage(1);
 	};
 
@@ -185,8 +198,12 @@ const ExperimentCasesPage = () => {
 					page={page}
 					pageSize={pageSize}
 					onPageChange={setPage}
+					onPageSizeChange={handlePageSizeChange}
+					statusFilter={statusFilter}
+					onStatusFilterChange={handleStatusFilterChange}
 					activeInquiry={activeInquiry}
-					isLoading={isLoading || isFetching}
+					isLoading={isLoading}
+					isFetching={isFetching}
 				/>
 			</div>
 		</DashboardPage>
