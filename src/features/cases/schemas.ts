@@ -26,17 +26,12 @@ export type CaseAsk = z.infer<typeof CaseAskSchema>;
  * nhưng vẫn nằm trong constraint nên vẫn phải parse được.
  */
 export const CaseStatusSchema = z.enum([
-	"open",
-	"closed",
-	"answered",
-	"expired_unanswered",
-	"expired_unclosed",
 	"annotation_free",
-	"pending",
+	"closed",
 	"asked",
-	"annotated",
 	"complete",
-	"deferred",
+	"auto_filled",
+	"expired_unanswered",
 ]);
 
 export type CaseStatus = z.infer<typeof CaseStatusSchema>;

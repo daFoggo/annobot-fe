@@ -9,6 +9,7 @@ import {
 } from "./dashboard-breadcrumb";
 import { DashboardHeaderDivider } from "./dashboard-header-divider";
 import { DashboardHelpMenu } from "./dashboard-help-menu";
+import { DashboardNotificationMenu } from "./dashboard-notification-menu";
 import { DashboardSearchTrigger } from "./dashboard-search-trigger";
 import { DashboardTimezonePicker } from "./dashboard-timezone-picker";
 import { DashboardUserMenu } from "./dashboard-user-menu";
@@ -58,6 +59,7 @@ export const DashboardHeader = ({ context, actions }: DashboardHeaderProps) => {
 					<DashboardSearchTrigger />
 					<div className="flex items-center gap-1">
 						<DashboardTimezonePicker />
+						<DashboardNotificationMenu />
 						<DashboardHelpMenu />
 						<ThemeToggle />
 					</div>

@@ -5,6 +5,7 @@ import {
 	useNavigate,
 } from "@tanstack/react-router";
 import { DashboardShell } from "@/components/layout/dashboard";
+import { AssistantProvider } from "@/features/assistant";
 import { getMeQueryOptions, useLogoutMutation } from "@/features/auth";
 import { DashboardHeaderContext } from "./-components/dashboard-header-context";
 
@@ -23,17 +24,19 @@ const DashboardLayoutRoute = () => {
 				})
 			}
 		>
-			<DashboardShell.Frame>
-				<DashboardShell.Header context={<DashboardHeaderContext />} />
-				<DashboardShell.Body>
-					<DashboardShell.Sidebar />
-					<DashboardShell.ProductMenu />
-					<DashboardShell.Content>
-						<Outlet />
-					</DashboardShell.Content>
-					<DashboardShell.Assistant />
-				</DashboardShell.Body>
-			</DashboardShell.Frame>
+			<AssistantProvider>
+				<DashboardShell.Frame>
+					<DashboardShell.Header context={<DashboardHeaderContext />} />
+					<DashboardShell.Body>
+						<DashboardShell.Sidebar />
+						<DashboardShell.ProductMenu />
+						<DashboardShell.Content>
+							<Outlet />
+						</DashboardShell.Content>
+						<DashboardShell.Assistant />
+					</DashboardShell.Body>
+				</DashboardShell.Frame>
+			</AssistantProvider>
 		</DashboardShell.Provider>
 	);
 };

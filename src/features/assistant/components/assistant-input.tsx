@@ -1,31 +1,28 @@
-import {
-	IconArrowUp,
-	IconHelpCircle,
-	IconPlayerStopFilled,
-} from "@tabler/icons-react";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { IconArrowUp, IconPlayerStopFilled } from "@tabler/icons-react";
+import type React from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
 	InputGroup,
 	InputGroupAddon,
 	InputGroupButton,
 	InputGroupTextarea,
 } from "@/components/ui/input-group";
-import { Kbd } from "@/components/ui/kbd";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useOptionalAssistantContext } from "../context";
-import type { AssistantExperimentContext } from "../schemas";
+import { AssistantQuickReplies } from "./assistant-quick-replies";
 
 export interface AssistantInputProps {
 	value?: string;
-	onChange?: (val: string) => void;
+	onChange?: (value: string) => void;
 	onSubmit?: () => void;
 	onStop?: () => void;
 	isGenerating?: boolean;
-	context?: AssistantExperimentContext;
+	placeholder?: string;
+	className?: string;
 }
 
 export function AssistantInput({
@@ -34,45 +31,101 @@ export function AssistantInput({
 	onSubmit: propOnSubmit,
 	onStop: propOnStop,
 	isGenerating: propIsGenerating,
-	context: propContext,
+	placeholder: propPlaceholder,
+	className: _className,
 }: AssistantInputProps = {}) {
 	const ctx = useOptionalAssistantContext();
-	const localRef = useRef<HTMLTextAreaElement>(null);
-	const textareaRef = ctx?.meta.inputRef ?? localRef;
+	const activeThreadId = ctx?.state.activeThreadId;
+	const isThreadClosed = ctx?.state.activeThread?.status === "closed";
 
-	const [uncontrolledValue, setUncontrolledValue] = useState("");
-	const value = propValue ?? ctx?.state.inputValue ?? uncontrolledValue;
-	const onChange =
-		propOnChange ?? ctx?.actions.setInputValue ?? setUncontrolledValue;
-	const onSubmit = propOnSubmit ?? ctx?.actions.submitInput ?? (() => {});
-	const onStop = propOnStop ?? ctx?.actions.stopGenerating ?? (() => {});
 	const isGenerating = propIsGenerating ?? ctx?.state.isGenerating ?? false;
-	const context = propContext ?? ctx?.state.context;
+	const value = propValue ?? ctx?.state.inputValue ?? "";
+	const onChange = propOnChange ?? ctx?.actions.setInputValue;
+	const onSubmitAction = propOnSubmit ?? ctx?.actions.submitInput;
+	const onStop = propOnStop ?? ctx?.actions.stopGenerating;
 
-	const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-		if (e.key === "Enter" && !e.shiftKey) {
-			e.preventDefault();
-			if (!isGenerating && value.trim()) {
-				onSubmit();
+	const textareaRef = useRef<HTMLTextAreaElement>(null);
+	const canSend = value.trim().length > 0 && !isGenerating && !isThreadClosed;
+
+	const lastAssistantMessage = useMemo(() => {
+		const msgs = ctx?.state.messages ?? [];
+		for (let i = msgs.length - 1; i >= 0; i--) {
+			const m = msgs[i];
+			if (m.role === "assistant" || m.direction === "out") {
+				return m;
 			}
 		}
-	};
+		return null;
+	}, [ctx?.state.messages]);
 
-	const canSend = value.trim().length > 0 && !isGenerating;
+	const quickReplies = useMemo(() => {
+		if (!activeThreadId || isThreadClosed) return [];
+		const contentJson = lastAssistantMessage?.content_json;
+		if (
+			contentJson &&
+			Array.isArray(contentJson.suggested_replies) &&
+			contentJson.suggested_replies.length > 0
+		) {
+			return contentJson.suggested_replies as string[];
+		}
+		return ["Not sure", "Not relevant", "Decide later"];
+	}, [activeThreadId, isThreadClosed, lastAssistantMessage]);
+
+	const handleSelectQuickReply = useCallback(
+		(reply: string) => {
+			if (reply === "Decide later") {
+				ctx?.actions.deferActiveThread();
+			} else {
+				ctx?.actions.sendMessage(reply);
+			}
+		},
+		[ctx?.actions],
+	);
+
+	const onSubmit = useCallback(() => {
+		if (!canSend) return;
+		onSubmitAction?.();
+		textareaRef.current?.focus();
+	}, [canSend, onSubmitAction]);
+
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+			if (e.key === "Enter" && !e.shiftKey) {
+				e.preventDefault();
+				onSubmit();
+			}
+		},
+		[onSubmit],
+	);
+
+	// If rendered in context without an active thread and no explicit prop value, do not render
+	if (!propValue && !activeThreadId && ctx) {
+		return null;
+	}
 
 	return (
 		<div className="shrink-0 border-t border-border p-3 bg-background/80 backdrop-blur-xs flex flex-col gap-2">
+			{/* Quick reply suggestion chips */}
+			{quickReplies.length > 0 && (
+				<AssistantQuickReplies
+					options={quickReplies}
+					disabled={isGenerating}
+					onSelect={handleSelectQuickReply}
+				/>
+			)}
+
 			{/* Text input area */}
 			<InputGroup className="min-h-12 items-end rounded-lg bg-card/60 border border-input focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 transition-all">
 				<InputGroupTextarea
 					ref={textareaRef}
 					value={value}
-					onChange={(e) => onChange(e.target.value)}
+					onChange={(e) => onChange?.(e.target.value)}
 					onKeyDown={handleKeyDown}
 					placeholder={
-						context?.title
-							? `> Ask about "${context.title}"...`
-							: "> Ask AnnoBot anything or type / for commands..."
+						propPlaceholder ??
+						(activeThreadId
+							? "> Type your reply or pick a suggestion above..."
+							: "> Ask AnnoBot anything or type / for commands...")
 					}
 					rows={1}
 					className="max-h-32 text-xs py-2 px-3 leading-relaxed placeholder:text-muted-foreground/70 font-mono"
@@ -94,7 +147,7 @@ export function AssistantInput({
 							>
 								<IconPlayerStopFilled className="size-3" />
 							</TooltipTrigger>
-							<TooltipContent side="top">Stop generating</TooltipContent>
+							<TooltipContent side="top">Stop</TooltipContent>
 						</Tooltip>
 					) : (
 						<InputGroupButton
@@ -111,46 +164,12 @@ export function AssistantInput({
 				</InputGroupAddon>
 			</InputGroup>
 
-			{/* Sub-footer shortcut hints */}
-			<div className="flex items-center justify-between px-1 text-[11px] text-muted-foreground select-none font-mono">
-				<Tooltip>
-					<TooltipTrigger
-						render={
-							<button
-								type="button"
-								className="flex items-center gap-1 hover:text-foreground transition-colors cursor-help"
-							/>
-						}
-					>
-						<IconHelpCircle className="size-3" />
-						<span>? for shortcuts</span>
-					</TooltipTrigger>
-					<TooltipContent
-						side="top"
-						className="flex flex-col gap-1 text-[11px] p-2 font-mono"
-					>
-						<div className="flex items-center justify-between gap-4">
-							<span>Send message</span>
-							<Kbd>Enter</Kbd>
-						</div>
-						<div className="flex items-center justify-between gap-4">
-							<span>New line</span>
-							<span className="flex items-center gap-1">
-								<Kbd>Shift</Kbd> + <Kbd>Enter</Kbd>
-							</span>
-						</div>
-						<div className="flex items-center justify-between gap-4">
-							<span>Toggle assistant panel</span>
-							<span className="flex items-center gap-1">
-								<Kbd>Ctrl</Kbd> + <Kbd>J</Kbd>
-							</span>
-						</div>
-					</TooltipContent>
-				</Tooltip>
-
-				<div className="flex items-center gap-1.5 text-[10px] text-muted-foreground select-none font-mono">
-					<span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
-					<span>AnnoBot connected</span>
+			{/* Sub-footer keyboard hint */}
+			<div className="flex items-center justify-between px-1 text-xs text-muted-foreground select-none font-mono">
+				<span className="truncate">Enter to send, Shift+Enter for newline</span>
+				<div className="flex items-center gap-1.5 shrink-0 pl-2">
+					<span className="size-1.5 rounded-full bg-primary shrink-0" />
+					<span>AnnoBot</span>
 				</div>
 			</div>
 		</div>

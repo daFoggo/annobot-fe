@@ -91,12 +91,10 @@ export function AssistantWelcome({
 								{context.title}
 							</span>
 						</div>
-						<Badge variant="outline" className="text-[10px] px-1 py-0">
-							{context.service ?? "active"}
-						</Badge>
+						<Badge variant="outline">{context.service ?? "active"}</Badge>
 					</div>
 
-					<p className="text-[11px] text-muted-foreground">
+					<p className="text-xs text-muted-foreground">
 						Connected to active experiment with {context.inquiriesCount ?? 0}{" "}
 						inquiries configured.
 					</p>
@@ -106,7 +104,6 @@ export function AssistantWelcome({
 							type="button"
 							variant="secondary"
 							size="xs"
-							className="text-[11px] h-6"
 							onClick={() =>
 								onSelectPrompt(
 									`Give me an executive summary of experiment "${context.title}".`,
@@ -120,7 +117,6 @@ export function AssistantWelcome({
 							type="button"
 							variant="secondary"
 							size="xs"
-							className="text-[11px] h-6"
 							onClick={() =>
 								onSelectPrompt(
 									`What are the most recent cases or anomalies detected in "${context.title}"?`,
@@ -135,7 +131,7 @@ export function AssistantWelcome({
 			) : (
 				/* Generic quick chips */
 				<div className="space-y-2 font-sans">
-					<span className="text-[11px] font-medium text-muted-foreground">
+					<span className="text-xs font-medium text-muted-foreground">
 						Suggested actions:
 					</span>
 					<div className="flex flex-wrap gap-1.5">
@@ -143,7 +139,6 @@ export function AssistantWelcome({
 							type="button"
 							variant="outline"
 							size="xs"
-							className="text-xs h-6.5"
 							onClick={() => onSelectPrompt("/analyze")}
 						>
 							<IconChartBar className="size-3" />
@@ -153,7 +148,6 @@ export function AssistantWelcome({
 							type="button"
 							variant="outline"
 							size="xs"
-							className="text-xs h-6.5"
 							onClick={() => onSelectPrompt("/cases")}
 						>
 							<IconChecklist className="size-3" />
@@ -163,7 +157,6 @@ export function AssistantWelcome({
 							type="button"
 							variant="outline"
 							size="xs"
-							className="text-xs h-6.5"
 							onClick={() => onSelectPrompt("/explain")}
 						>
 							<IconHelp className="size-3" />

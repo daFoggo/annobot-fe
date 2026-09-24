@@ -15,6 +15,7 @@ export type CaseStage =
 	| "waiting"
 	| "asked"
 	| "answered"
+	| "auto_filled"
 	| "dropped";
 
 export interface StageMeta {
@@ -52,36 +53,38 @@ const STAGE_META: Record<CaseStage, StageMeta> = {
 		hint: "The occupant replied; the annotation is attached to this case.",
 		color: "var(--chart-1)",
 	},
+	auto_filled: {
+		stage: "auto_filled",
+		label: "Auto-filled",
+		hint: "The system proposed an annotation from similar cases; awaiting review.",
+		color: "var(--chart-5)",
+	},
 	dropped: {
 		stage: "dropped",
 		label: "No annotation",
-		hint: "Skipped because similar cases exist, or asked and never answered.",
+		hint: "Asked and never answered before the TTL expired.",
 		color: "var(--muted-foreground)",
 	},
 };
 
 const STATUS_TO_STAGE: Record<CaseStatus, CaseStage> = {
 	annotation_free: "measured",
-	open: "waiting",
 	closed: "waiting",
-	pending: "waiting",
 	asked: "asked",
-	answered: "answered",
-	annotated: "answered",
 	complete: "answered",
-	deferred: "dropped",
+	auto_filled: "auto_filled",
 	expired_unanswered: "dropped",
-	expired_unclosed: "dropped",
 };
 
 /**
  * Fixed display order, following the flow: detected -> awaiting -> asked ->
- * annotated, then the two terminal branches. Never re-sorted by count.
+ * annotated -> auto-filled, then the two terminal branches. Never re-sorted by count.
  */
 export const STAGE_ORDER: readonly CaseStage[] = [
 	"waiting",
 	"asked",
 	"answered",
+	"auto_filled",
 	"measured",
 	"dropped",
 ] as const;
@@ -98,6 +101,7 @@ export const countByStage = (cases: Case[]): Record<CaseStage, number> => {
 		waiting: 0,
 		asked: 0,
 		answered: 0,
+		auto_filled: 0,
 		dropped: 0,
 	};
 	for (const item of cases) counts[stageOf(item.status)] += 1;

@@ -1,10 +1,16 @@
 import type React from "react";
 import { useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { AssistantProvider, useAssistantContext } from "../context";
+import {
+	AssistantProvider,
+	useAssistantContext,
+	useOptionalAssistantContext,
+} from "../context";
 import type { AssistantExperimentContext } from "../schemas";
 import { AssistantCollapsedTrigger } from "./assistant-collapsed-trigger";
+import { AssistantContextBar } from "./assistant-context-bar";
 import { AssistantHeader } from "./assistant-header";
+import { AssistantInbox } from "./assistant-inbox";
 import { AssistantInput } from "./assistant-input";
 import { AssistantMessages } from "./assistant-messages";
 import { AssistantWelcome } from "./assistant-welcome";
@@ -15,8 +21,8 @@ export interface AssistantRootProps {
 }
 
 /**
- * Khung hiển thị của Assistant (Frame/Root container).
- * Hỗ trợ kéo thả thay đổi kích thước (desktop) và hiển thị thu gọn (collapsed strip).
+ * Frame/Root container of Assistant.
+ * Supports resizing (desktop) and collapsed strip display.
  */
 export function AssistantRoot({ children, className }: AssistantRootProps) {
 	const ctx = useAssistantContext();
@@ -92,6 +98,26 @@ export function AssistantRoot({ children, className }: AssistantRootProps) {
 	);
 }
 
+export function AssistantDefaultContent() {
+	const ctx = useOptionalAssistantContext();
+	const activeThreadId = ctx?.state.activeThreadId;
+
+	return (
+		<>
+			<AssistantHeader />
+			{activeThreadId ? (
+				<div className="flex flex-1 flex-col overflow-hidden">
+					<AssistantContextBar />
+					<AssistantMessages emptyState={<AssistantWelcome />} />
+					<AssistantInput />
+				</div>
+			) : (
+				<AssistantInbox />
+			)}
+		</>
+	);
+}
+
 export interface AssistantPanelProps {
 	context?: AssistantExperimentContext;
 	children?: React.ReactNode;
@@ -102,7 +128,8 @@ export interface AssistantPanelProps {
 }
 
 /**
- * Drop-in component tiện lợi tự động ghép nối Provider + Root + Subcomponents.
+ * Drop-in panel component composing Provider + Root + Subcomponents.
+ * Reuses existing AssistantProvider if mounted within one (e.g. Dashboard layout).
  */
 export function AssistantPanel({
 	context,
@@ -112,6 +139,18 @@ export function AssistantPanel({
 	defaultOpen,
 	onOpenChange,
 }: AssistantPanelProps = {}) {
+	const existingContext = useOptionalAssistantContext();
+
+	const content = (
+		<AssistantRoot className={className}>
+			{children ?? <AssistantDefaultContent />}
+		</AssistantRoot>
+	);
+
+	if (existingContext) {
+		return content;
+	}
+
 	return (
 		<AssistantProvider
 			context={context}
@@ -119,15 +158,7 @@ export function AssistantPanel({
 			defaultOpen={defaultOpen}
 			onOpenChange={onOpenChange}
 		>
-			<AssistantRoot className={className}>
-				{children ?? (
-					<>
-						<AssistantHeader />
-						<AssistantMessages emptyState={<AssistantWelcome />} />
-						<AssistantInput />
-					</>
-				)}
-			</AssistantRoot>
+			{content}
 		</AssistantProvider>
 	);
 }

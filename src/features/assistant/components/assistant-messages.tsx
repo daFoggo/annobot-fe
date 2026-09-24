@@ -19,7 +19,8 @@ import type { ChatMessage } from "../schemas";
 /**
  * Format timestamp sang dạng giờ:phút AM/PM
  */
-function formatTime(isoString: string): string {
+function formatTime(isoString?: string): string {
+	if (!isoString) return "";
 	try {
 		return new Date(isoString).toLocaleTimeString([], {
 			hour: "2-digit",
@@ -65,23 +66,23 @@ function StreamCodeBlock({
 	);
 
 	return (
-		<div className="my-2.5 overflow-hidden rounded-md border border-border bg-card/60 font-mono text-[11px] shadow-2xs">
+		<div className="my-2.5 overflow-hidden rounded-md border border-border bg-card/60 font-mono text-xs shadow-2xs">
 			{/* Top bar */}
-			<div className="flex h-7 items-center justify-between border-b border-border/60 bg-muted/60 px-2.5 text-[10px] text-muted-foreground select-none">
+			<div className="flex h-7 items-center justify-between border-b border-border/60 bg-muted/60 px-2.5 text-xs text-muted-foreground select-none">
 				<span className="font-semibold uppercase tracking-wider text-muted-foreground/80">
 					{language || "text"}
 				</span>
 				<Button
 					type="button"
 					variant="ghost"
-					size="icon-xs"
+					size="xs"
 					onClick={handleCopy}
-					className="h-5 gap-1 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+					className="text-muted-foreground hover:text-foreground font-mono"
 				>
 					{copied ? (
 						<>
-							<IconCheck className="size-3 text-emerald-500" />
-							<span className="text-emerald-500 font-medium">Copied</span>
+							<IconCheck className="size-3 text-primary" />
+							<span className="text-primary font-medium">Copied</span>
 						</>
 					) : (
 						<>
@@ -101,10 +102,10 @@ function StreamCodeBlock({
 								key={`code-line-${item.lineNumber}`}
 								className="leading-relaxed hover:bg-muted/30"
 							>
-								<td className="w-7 select-none pr-2.5 text-right font-mono text-[10px] text-muted-foreground/50 border-r border-border/40 align-top">
+								<td className="w-7 select-none pr-2.5 text-right font-mono text-xs text-muted-foreground/50 border-r border-border/40 align-top">
 									{item.lineNumber}
 								</td>
-								<td className="pl-3 font-mono text-[11px] text-foreground whitespace-pre break-all">
+								<td className="pl-3 font-mono text-xs text-foreground whitespace-pre break-all">
 									{item.line}
 								</td>
 							</tr>
@@ -128,7 +129,7 @@ function formatInlineMarkdown(text: string): ReactNode {
 				<code
 					// biome-ignore lint/suspicious/noArrayIndexKey: markdown token position
 					key={`inline-code-${index}`}
-					className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground font-medium"
+					className="rounded bg-muted px-1 py-0.5 font-mono text-xs text-foreground font-medium"
 				>
 					{part.slice(1, -1)}
 				</code>
@@ -319,18 +320,13 @@ function StreamAssistantMessage({
 
 	return (
 		<div className="flex flex-col gap-2 font-mono text-xs">
-			{/* Thought / Step indicator like Opik */}
+			{/* Thought / Step indicator */}
 			{isLatest && isGenerating && !message.content ? (
-				<div className="flex items-center gap-2 text-primary text-[11px] font-mono py-1 select-none">
+				<div className="flex items-center gap-2 text-primary text-xs font-mono py-1 select-none">
 					<span className="size-1.5 rounded-full bg-primary animate-pulse shrink-0" />
-					<span>Thinking & analyzing telemetry...</span>
+					<span>Analyzing context...</span>
 				</div>
-			) : (
-				<div className="flex items-center gap-2 text-muted-foreground text-[11px] font-mono py-0.5 select-none">
-					<span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
-					<span>thought for 2s · telemetry verified</span>
-				</div>
-			)}
+			) : null}
 
 			{/* Main text content */}
 			{message.content ? (
@@ -339,7 +335,7 @@ function StreamAssistantMessage({
 				</div>
 			) : isLatest && isGenerating ? (
 				<div className="text-muted-foreground italic text-xs py-1">
-					Crunching inquiries and detection rules...
+					Analyzing sensor data...
 				</div>
 			) : (
 				<span className="text-muted-foreground italic">No content</span>
@@ -353,11 +349,11 @@ function StreamAssistantMessage({
 						variant="ghost"
 						size="icon-xs"
 						onClick={handleCopy}
-						className="size-5 text-muted-foreground hover:text-foreground"
+						className="text-muted-foreground hover:text-foreground"
 						title={copied ? "Copied" : "Copy response"}
 					>
 						{copied ? (
-							<IconCheck className="size-3 text-emerald-500" />
+							<IconCheck className="size-3 text-primary" />
 						) : (
 							<IconCopy className="size-3" />
 						)}
@@ -368,7 +364,7 @@ function StreamAssistantMessage({
 						variant="ghost"
 						size="icon-xs"
 						onClick={() => setReaction(reaction === "up" ? null : "up")}
-						className={`size-5 hover:text-foreground ${reaction === "up" ? "text-primary" : "text-muted-foreground"}`}
+						className={`hover:text-foreground ${reaction === "up" ? "text-primary" : "text-muted-foreground"}`}
 						title="Helpful"
 					>
 						<IconThumbUp className="size-3" />
@@ -379,7 +375,7 @@ function StreamAssistantMessage({
 						variant="ghost"
 						size="icon-xs"
 						onClick={() => setReaction(reaction === "down" ? null : "down")}
-						className={`size-5 hover:text-foreground ${reaction === "down" ? "text-destructive" : "text-muted-foreground"}`}
+						className={`hover:text-foreground ${reaction === "down" ? "text-destructive" : "text-muted-foreground"}`}
 						title="Not helpful"
 					>
 						<IconThumbDown className="size-3" />
@@ -405,7 +401,8 @@ function groupMessagesIntoTurns(messages: ChatMessage[]): ChatTurn[] {
 	let currentTurn: ChatTurn | null = null;
 
 	for (const msg of messages) {
-		if (msg.role === "user") {
+		const isUser = msg.role === "user" || msg.direction === "in";
+		if (isUser) {
 			if (currentTurn) {
 				turns.push(currentTurn);
 			}
@@ -452,6 +449,7 @@ export function AssistantMessages({
 	emptyState,
 }: AssistantMessagesProps = {}) {
 	const contextValue = useOptionalAssistantContext();
+
 	const messages = propMessages ?? contextValue?.state.messages ?? [];
 	const isGenerating =
 		propIsGenerating ?? contextValue?.state.isGenerating ?? false;
@@ -459,11 +457,15 @@ export function AssistantMessages({
 	const turns = useMemo(() => groupMessagesIntoTurns(messages), [messages]);
 
 	if (messages.length === 0) {
-		return <div className="flex-1 overflow-y-auto">{emptyState}</div>;
+		return (
+			<div className="flex flex-col flex-1 min-h-0 bg-background overflow-y-auto">
+				{emptyState ?? null}
+			</div>
+		);
 	}
 
 	return (
-		<div className="relative flex-1 min-h-0 bg-background select-text">
+		<div className="relative flex flex-col flex-1 min-h-0 bg-background select-text">
 			<MessageScrollerProvider>
 				<MessageScroller className="size-full">
 					<MessageScrollerViewport className="p-0 scrollbar-thin">
@@ -475,7 +477,7 @@ export function AssistantMessages({
 										key={turn.id}
 										className="relative border-b border-border/30 last:border-b-0 pb-6"
 									>
-										{/* Pinned Sticky User Prompt Header (distinct muted bg, sticky while reading the answer) */}
+										{/* Pinned Sticky User Prompt Header */}
 										{turn.userMessage && (
 											<div className="sticky top-0 z-10 flex items-start gap-2.5 bg-muted px-3.5 py-2.5 font-mono text-xs text-foreground group transition-colors">
 												<span className="text-primary font-bold select-none shrink-0 text-sm leading-none pt-0.5">
@@ -484,8 +486,12 @@ export function AssistantMessages({
 												<span className="font-semibold text-foreground flex-1 break-words whitespace-pre-wrap leading-relaxed select-text">
 													{turn.userMessage.content}
 												</span>
-												<span className="text-[10px] text-muted-foreground/80 shrink-0 select-none pt-0.5 opacity-70 group-hover:opacity-100 transition-opacity font-mono">
-													{formatTime(turn.userMessage.createdAt)}
+												<span className="text-xs text-muted-foreground/80 shrink-0 select-none pt-0.5 opacity-70 group-hover:opacity-100 transition-opacity font-mono">
+													{formatTime(
+														turn.userMessage.created_at ??
+															turn.userMessage.createdAt ??
+															"",
+													)}
 												</span>
 											</div>
 										)}

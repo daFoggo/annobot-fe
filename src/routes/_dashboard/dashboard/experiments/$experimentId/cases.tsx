@@ -58,6 +58,7 @@ const ROWS_PER_PAGE = 10;
 interface CasesSearch {
 	inquiry?: string;
 	page?: number;
+	thread?: string;
 }
 
 const formatMinutes = (value: number | null) => {
@@ -106,7 +107,11 @@ const formatEnergy = (wh: number) =>
 
 const ExperimentCasesPage = () => {
 	const { experimentId } = Route.useParams();
-	const { inquiry: inquiryParam, page = 1 } = Route.useSearch();
+	const {
+		inquiry: inquiryParam,
+		page = 1,
+		thread: threadParam,
+	} = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	const { data: inquiries } = useSuspenseQuery(
@@ -198,9 +203,7 @@ const ExperimentCasesPage = () => {
 				0;
 			return sum + value;
 		}, 0);
-		const annotated = cases.filter((item) =>
-			["answered", "annotated", "complete"].includes(item.status),
-		).length;
+		const annotated = cases.filter((item) => item.status === "complete").length;
 		return {
 			cases: cases.length,
 			medianDuration: median(durations),
@@ -222,6 +225,7 @@ const ExperimentCasesPage = () => {
 		const params = new URLSearchParams();
 		if (inquiryId) params.set("inquiry", inquiryId);
 		if (value > 1) params.set("page", String(value));
+		if (threadParam) params.set("thread", threadParam);
 		const query = params.toString();
 		return `/dashboard/experiments/${experimentId}/cases${query ? `?${query}` : ""}`;
 	};
@@ -229,7 +233,8 @@ const ExperimentCasesPage = () => {
 	const goToPage = (event: React.MouseEvent, value: number) => {
 		event.preventDefault();
 		navigate({
-			search: (): CasesSearch => ({
+			search: (prev: CasesSearch): CasesSearch => ({
+				...prev,
 				inquiry: inquiryId,
 				page: value > 1 ? value : undefined,
 			}),
@@ -250,8 +255,11 @@ const ExperimentCasesPage = () => {
 							value={selected}
 							onValueChange={(value) =>
 								navigate({
-									search: (): CasesSearch =>
-										value === ALL ? {} : { inquiry: String(value) },
+									search: (prev: CasesSearch): CasesSearch => ({
+										...prev,
+										inquiry: value === ALL ? undefined : String(value),
+										page: undefined,
+									}),
 									replace: true,
 								})
 							}
@@ -430,6 +438,8 @@ export const Route = createFileRoute(
 		if (typeof search.inquiry === "string") next.inquiry = search.inquiry;
 		const page = Number(search.page);
 		if (Number.isInteger(page) && page > 1) next.page = page;
+		if (typeof search.thread === "string" && search.thread.length > 0)
+			next.thread = search.thread;
 		return next;
 	},
 	loader: async ({ context, params }) => {

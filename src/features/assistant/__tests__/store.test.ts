@@ -11,18 +11,7 @@ describe("useAssistantStore", () => {
 		useAssistantStore.setState({
 			isOpen: true,
 			width: DEFAULT_ASSISTANT_WIDTH,
-			conversations: [
-				{
-					id: "test_conv",
-					title: "New chat",
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-					messages: [],
-				},
-			],
-			activeConversationId: "test_conv",
-			isGenerating: false,
-			streamingMessageId: null,
+			activeThreadId: null,
 		});
 	});
 
@@ -45,40 +34,18 @@ describe("useAssistantStore", () => {
 		expect(useAssistantStore.getState().width).toBe(450);
 	});
 
-	it("creates new chat and switches active conversation", () => {
-		const newId = useAssistantStore.getState().newChat("exp-123");
-		const state = useAssistantStore.getState();
-
-		expect(state.activeConversationId).toBe(newId);
-		expect(state.conversations.length).toBe(2);
-		expect(state.conversations[0].experimentId).toBe("exp-123");
+	it("resets width to default", () => {
+		useAssistantStore.getState().setWidth(500);
+		expect(useAssistantStore.getState().width).toBe(500);
+		useAssistantStore.getState().resetWidth();
+		expect(useAssistantStore.getState().width).toBe(DEFAULT_ASSISTANT_WIDTH);
 	});
 
-	it("clears active chat without removing conversation", () => {
-		useAssistantStore.setState({
-			conversations: [
-				{
-					id: "test_conv",
-					title: "Existing chat",
-					createdAt: new Date().toISOString(),
-					updatedAt: new Date().toISOString(),
-					messages: [
-						{
-							id: "m1",
-							role: "user",
-							content: "hello",
-							createdAt: new Date().toISOString(),
-							status: "done",
-						},
-					],
-				},
-			],
-			activeConversationId: "test_conv",
-		});
-
-		useAssistantStore.getState().clearActiveChat();
-		const state = useAssistantStore.getState();
-		expect(state.conversations[0].messages).toEqual([]);
-		expect(state.conversations[0].title).toBe("New chat");
+	it("sets active thread id", () => {
+		expect(useAssistantStore.getState().activeThreadId).toBeNull();
+		useAssistantStore.getState().setActiveThreadId("thread-123");
+		expect(useAssistantStore.getState().activeThreadId).toBe("thread-123");
+		useAssistantStore.getState().setActiveThreadId(null);
+		expect(useAssistantStore.getState().activeThreadId).toBeNull();
 	});
 });

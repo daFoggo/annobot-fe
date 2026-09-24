@@ -13,17 +13,23 @@ import {
 import { experimentDetailQueryOptions } from "@/features/experiments";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+	inboxQueryOptions,
+	threadDetailQueryOptions,
+	threadMessagesQueryOptions,
+	useDeferThreadMutation,
+	useOpenThreadMutation,
+	useSendMessageMutation,
+} from "./queries";
 import type {
 	AssistantExperimentContext,
-	ChatConversation,
 	ChatMessage,
+	InboxResponse,
+	ThreadDetail,
 } from "./schemas";
 import {
 	DEFAULT_ASSISTANT_WIDTH,
-	useAssistantActiveConversation,
-	useAssistantActiveConversationId,
-	useAssistantConversations,
-	useAssistantIsGenerating,
+	useAssistantActiveThreadId,
 	useAssistantIsOpen,
 	useAssistantStore,
 	useAssistantWidth,
@@ -32,10 +38,11 @@ import {
 export interface AssistantState {
 	isOpen: boolean;
 	width: number;
-	conversations: ChatConversation[];
-	activeConversationId: string;
-	activeConversation?: ChatConversation;
+	activeThreadId: string | null;
+	activeThread?: ThreadDetail;
 	messages: ChatMessage[];
+	inbox?: InboxResponse;
+	pendingCount: number;
 	isGenerating: boolean;
 	context?: AssistantExperimentContext;
 	inputValue: string;
@@ -46,18 +53,19 @@ export interface AssistantActions {
 	toggleOpen: () => void;
 	setWidth: (width: number) => void;
 	resetWidth: () => void;
-	newChat: (experimentId?: string) => string;
-	selectConversation: (id: string) => void;
-	deleteConversation: (id: string) => void;
-	clearActiveChat: () => void;
+	selectThread: (id: string | null) => void;
+	openThreadForCase: (
+		caseId: string,
+		reason?: string,
+	) => Promise<ThreadDetail | undefined>;
+	deferActiveThread: () => Promise<void>;
 	setInputValue: (val: string) => void;
 	submitInput: () => void;
-	sendMessage: (
-		content: string,
-		context?: AssistantExperimentContext,
-	) => Promise<void>;
+	sendMessage: (content: string) => Promise<void>;
 	stopGenerating: () => void;
 	selectPrompt: (prompt: string) => void;
+	newChat: () => void;
+	clearActiveChat: () => void;
 }
 
 export interface AssistantMeta {
@@ -85,7 +93,7 @@ export interface AssistantProviderProps {
 /**
  * Provider cho Assistant compound component theo chuẩn Vercel Composition Patterns.
  * Tách biệt State, Actions và Meta để cho phép Dependency Injection và kiểm thử dễ dàng.
- * Hỗ trợ controlled prop `open`, `defaultOpen`, và tự động mở khi ở trang experiment detail, thu gọn khi ở ngoài.
+ * Hỗ trợ deep link ?thread=, polling inbox 30s, và scope thread đóng băng khi mở thread.
  */
 export function AssistantProvider({
 	children,
@@ -100,18 +108,9 @@ export function AssistantProvider({
 	const storeIsOpen = useAssistantIsOpen();
 	const storeSetOpen = useAssistantStore((s) => s.setOpen);
 	const width = useAssistantWidth();
-	const isGenerating = useAssistantIsGenerating();
-	const conversations = useAssistantConversations();
-	const activeConvId = useAssistantActiveConversationId();
-	const activeConv = useAssistantActiveConversation();
-
 	const setWidth = useAssistantStore((s) => s.setWidth);
-	const newChat = useAssistantStore((s) => s.newChat);
-	const selectConversation = useAssistantStore((s) => s.selectConversation);
-	const deleteConversation = useAssistantStore((s) => s.deleteConversation);
-	const clearActiveChat = useAssistantStore((s) => s.clearActiveChat);
-	const sendMessage = useAssistantStore((s) => s.sendMessage);
-	const stopGenerating = useAssistantStore((s) => s.stopGenerating);
+	const activeThreadId = useAssistantActiveThreadId();
+	const setActiveThreadId = useAssistantStore((s) => s.setActiveThreadId);
 
 	// Tự động nhận diện context thí nghiệm hiện tại nếu không được truyền từ props
 	const routerState = useRouterState();
@@ -119,6 +118,20 @@ export function AssistantProvider({
 	const match = pathname.match(/\/experiments\/([^/]+)/);
 	const experimentId = match && match[1] !== "new" ? match[1] : undefined;
 	const isExperimentDetail = Boolean(experimentId);
+
+	// Deep link ?thread= từ URL
+	const search = routerState?.location?.search as
+		| Record<string, unknown>
+		| undefined;
+	const urlThreadId =
+		typeof search?.thread === "string" ? search.thread : undefined;
+
+	useEffect(() => {
+		if (urlThreadId) {
+			setActiveThreadId(urlThreadId);
+			storeSetOpen(true);
+		}
+	}, [urlThreadId, setActiveThreadId, storeSetOpen]);
 
 	// Quản lý chuyển đổi route: vào experiment detail thì default open, ra ngoài thì default collapse
 	const prevScopeRef = useRef<boolean | null>(null);
@@ -130,12 +143,10 @@ export function AssistantProvider({
 		prevScopeRef.current = isExperimentDetail;
 
 		if (prevScope === null) {
-			// Mount lần đầu: ưu tiên defaultOpen nếu có, nếu không thì dựa theo phạm vi experiment detail
 			const initialOpen =
 				defaultOpen !== undefined ? defaultOpen : isExperimentDetail;
 			storeSetOpen(initialOpen);
 		} else if (isExperimentDetail !== prevScope) {
-			// Khi chuyển vùng giữa ngoài detail và trong detail:
 			storeSetOpen(isExperimentDetail);
 			onOpenChange?.(isExperimentDetail);
 		}
@@ -160,16 +171,42 @@ export function AssistantProvider({
 	const [inputValue, setInputValue] = useState("");
 	const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
+	// TanStack Query: Inbox
+	const { data: inbox } = useQuery(inboxQueryOptions());
+	const pendingCount = inbox?.pending?.length ?? 0;
+
+	// TanStack Query: Active Thread Detail & Messages
+	const { data: activeThread } = useQuery({
+		...threadDetailQueryOptions(activeThreadId ?? ""),
+		enabled: Boolean(activeThreadId),
+	});
+
+	const { data: threadMessages = [] } = useQuery({
+		...threadMessagesQueryOptions(activeThreadId ?? ""),
+		enabled: Boolean(activeThreadId),
+	});
+
+	// Mutations
+	const sendMutation = useSendMessageMutation(activeThreadId ?? "");
+	const deferMutation = useDeferThreadMutation();
+	const openThreadMutation = useOpenThreadMutation();
+
+	const isGenerating = sendMutation.isPending;
+
+	// Scope: Khi đang trong thread, scope đóng băng theo thread (experiment_id của thread).
+	// Khi ở ngoài, scope lấy từ URL hiện tại.
+	const effectiveExperimentId = activeThread?.experiment_id ?? experimentId;
+
 	const { data: experiment } = useQuery({
-		...experimentDetailQueryOptions(experimentId ?? ""),
-		enabled: !!experimentId && !customContext,
+		...experimentDetailQueryOptions(effectiveExperimentId ?? ""),
+		enabled: Boolean(effectiveExperimentId) && !customContext,
 	});
 
 	const derivedContext = useMemo<AssistantExperimentContext | undefined>(() => {
 		if (customContext) return customContext;
-		if (!experimentId) return undefined;
+		if (!effectiveExperimentId) return undefined;
 		return {
-			experimentId,
+			experimentId: effectiveExperimentId,
 			title: experiment?.title,
 			service: experiment?.service,
 			inquiriesCount: experiment?.inquiries?.length ?? 0,
@@ -179,32 +216,81 @@ export function AssistantProvider({
 					? "Setup"
 					: "Overview",
 		};
-	}, [customContext, experimentId, experiment, pathname]);
+	}, [customContext, effectiveExperimentId, experiment, pathname]);
 
 	const resetWidth = useCallback(() => {
 		setWidth(DEFAULT_ASSISTANT_WIDTH);
 	}, [setWidth]);
 
+	const selectThread = useCallback(
+		(id: string | null) => {
+			setActiveThreadId(id);
+		},
+		[setActiveThreadId],
+	);
+
+	const openThreadForCase = useCallback(
+		async (caseId: string, reason?: string) => {
+			const thread = await openThreadMutation.mutateAsync({
+				case_id: caseId,
+				reason,
+			});
+			if (thread?.id) {
+				setActiveThreadId(thread.id);
+				setOpen(true);
+			}
+			return thread;
+		},
+		[openThreadMutation, setActiveThreadId, setOpen],
+	);
+
+	const deferActiveThread = useCallback(async () => {
+		if (!activeThreadId) return;
+		await deferMutation.mutateAsync(activeThreadId);
+		setActiveThreadId(null);
+	}, [activeThreadId, deferMutation, setActiveThreadId]);
+
+	const sendMessage = useCallback(
+		async (content: string) => {
+			const text = content.trim();
+			if (!activeThreadId || !text || sendMutation.isPending) return;
+			await sendMutation.mutateAsync({ content: text });
+		},
+		[activeThreadId, sendMutation],
+	);
+
 	const submitInput = useCallback(() => {
 		const text = inputValue.trim();
 		if (!text || isGenerating) return;
 		setInputValue("");
-		sendMessage(text, derivedContext);
-	}, [inputValue, isGenerating, sendMessage, derivedContext]);
+		void sendMessage(text);
+	}, [inputValue, isGenerating, sendMessage]);
 
 	const selectPrompt = useCallback(
 		(prompt: string) => {
-			if (prompt.startsWith("/")) {
-				sendMessage(prompt, derivedContext);
+			if (prompt.startsWith("/") && activeThreadId) {
+				void sendMessage(prompt);
 			} else {
 				setInputValue(prompt);
 				inputRef.current?.focus();
 			}
 		},
-		[sendMessage, derivedContext],
+		[sendMessage, activeThreadId],
 	);
 
-	// Lắng nghe phím tắt toàn cục Ctrl+J / Cmd+J (Ctrl+B đã thuộc sidebar dashboard)
+	const stopGenerating = useCallback(() => {
+		// HTTP request completion or abort placeholder
+	}, []);
+
+	const newChat = useCallback(() => {
+		setActiveThreadId(null);
+	}, [setActiveThreadId]);
+
+	const clearActiveChat = useCallback(() => {
+		setActiveThreadId(null);
+	}, [setActiveThreadId]);
+
+	// Phím tắt toàn cục Ctrl+J / Cmd+J
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
@@ -229,10 +315,11 @@ export function AssistantProvider({
 			state: {
 				isOpen,
 				width,
-				conversations,
-				activeConversationId: activeConvId,
-				activeConversation: activeConv,
-				messages: activeConv?.messages ?? [],
+				activeThreadId,
+				activeThread,
+				messages: threadMessages,
+				inbox,
+				pendingCount,
 				isGenerating,
 				context: derivedContext,
 				inputValue,
@@ -242,15 +329,16 @@ export function AssistantProvider({
 				toggleOpen,
 				setWidth,
 				resetWidth,
-				newChat,
-				selectConversation,
-				deleteConversation,
-				clearActiveChat,
+				selectThread,
+				openThreadForCase,
+				deferActiveThread,
 				setInputValue,
 				submitInput,
 				sendMessage,
 				stopGenerating,
 				selectPrompt,
+				newChat,
+				clearActiveChat,
 			},
 			meta: {
 				isHydrated,
@@ -261,9 +349,11 @@ export function AssistantProvider({
 		[
 			isOpen,
 			width,
-			conversations,
-			activeConvId,
-			activeConv,
+			activeThreadId,
+			activeThread,
+			threadMessages,
+			inbox,
+			pendingCount,
 			isGenerating,
 			derivedContext,
 			inputValue,
@@ -271,14 +361,15 @@ export function AssistantProvider({
 			toggleOpen,
 			setWidth,
 			resetWidth,
-			newChat,
-			selectConversation,
-			deleteConversation,
-			clearActiveChat,
+			selectThread,
+			openThreadForCase,
+			deferActiveThread,
 			submitInput,
 			sendMessage,
 			stopGenerating,
 			selectPrompt,
+			newChat,
+			clearActiveChat,
 			isHydrated,
 			isMobile,
 		],

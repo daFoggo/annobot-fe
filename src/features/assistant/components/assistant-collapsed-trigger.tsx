@@ -1,4 +1,5 @@
 import { IconSparkles } from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
 import {
 	Tooltip,
 	TooltipContent,
@@ -15,6 +16,7 @@ export function AssistantCollapsedTrigger({
 	const ctx = useOptionalAssistantContext();
 	const storeToggle = useAssistantStore((s) => s.toggleOpen);
 	const toggleOpen = onOpen ?? ctx?.actions.toggleOpen ?? storeToggle;
+	const pendingCount = ctx?.state.pendingCount ?? 0;
 
 	return (
 		<Tooltip>
@@ -28,14 +30,21 @@ export function AssistantCollapsedTrigger({
 					/>
 				}
 			>
-				<IconSparkles className="size-4 shrink-0 text-primary transition-transform group-hover/trigger:scale-110" />
+				<div className="flex flex-col items-center gap-1.5">
+					<IconSparkles className="size-4 shrink-0 text-primary transition-transform group-hover/trigger:scale-110" />
+					{pendingCount > 0 ? (
+						<Badge variant="default">{pendingCount}</Badge>
+					) : null}
+				</div>
 
 				<span className="select-none text-xs font-semibold tracking-wider text-muted-foreground transition-colors [writing-mode:vertical-rl] rotate-180 group-hover/trigger:text-foreground">
 					AnnoBot
 				</span>
 			</TooltipTrigger>
 			<TooltipContent side="left" sideOffset={6}>
-				Open AnnoBot Assistant <span className="opacity-60">(Ctrl+J)</span>
+				Open AnnoBot Assistant{" "}
+				{pendingCount > 0 ? `(${pendingCount} pending) ` : ""}
+				<span className="opacity-60">(Ctrl+J)</span>
 			</TooltipContent>
 		</Tooltip>
 	);
