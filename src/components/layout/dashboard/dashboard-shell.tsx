@@ -2,6 +2,7 @@ import { useRouter } from "@tanstack/react-router";
 import type { PropsWithChildren, ReactNode } from "react";
 import { useCallback, useEffect, useRef } from "react";
 import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { AssistantPanel } from "@/features/assistant";
 import { cn } from "@/lib/utils";
 import {
 	useDashboardNavGroups,
@@ -233,4 +234,5 @@ export const DashboardShell = {
 	Sidebar: DashboardShellSidebar,
 	ProductMenu: DashboardShellProductMenu,
 	Content: DashboardShellContent,
+	Assistant: AssistantPanel,
 };

@@ -31,6 +31,7 @@ const DashboardLayoutRoute = () => {
 					<DashboardShell.Content>
 						<Outlet />
 					</DashboardShell.Content>
+					<DashboardShell.Assistant />
 				</DashboardShell.Body>
 			</DashboardShell.Frame>
 		</DashboardShell.Provider>

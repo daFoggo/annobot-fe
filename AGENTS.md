@@ -99,6 +99,7 @@ Every async UI must distinguish loading, error, and valid empty data.
 - Never hand-roll a styled `<button>`, `<a>`-as-button, badge/pill `<span>`, `<div>` card/alert/empty, or `<hr>` when the primitive exists.
 - Always use `<Badge>` for pills/tags, `<Skeleton>` for loading, `<Separator>` for dividers, `<Empty>` for empty states, `<Avatar>` (+ `AvatarFallback`), `<InputGroup>` for input+button, `FieldGroup`/`Field` for forms, `ToggleGroup` for 2–7 option sets.
 - Primitives' default shape is the design system: choose `variant`/`size` props, do not override `rounded-*`, `text-*`, or `px-*` on them.
+- Vertical `<Separator>` in flex rows: Base-UI defaults to `data-vertical:self-stretch`, which overrides `items-center` and misaligns top. Always use `my-auto self-center data-vertical:h-4 data-vertical:self-center` (and `data-horizontal:w-auto` for horizontal separators with `mx-*`).
 - If a primitive is missing, add it with the shadcn CLI (`npx shadcn@latest add <component>`), never hand-write a new UI primitive.
 - Use semantic theme tokens and Tailwind default scale only (see `10_design_tokens.md`). No arbitrary values, no raw palette colors, no manual `dark:` overrides.
 

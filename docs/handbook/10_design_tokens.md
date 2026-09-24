@@ -90,6 +90,32 @@ Rules:
 - Use `tw-animate-css` / Tailwind utilities before custom keyframes.
 - Respect reduced motion with `motion-safe:` / `motion-reduce:`.
 
+## Separator & Divider Usage Rules (Base UI Caveats)
+
+`<Separator>` (`src/components/ui/separator.tsx`) is built on Base UI (`@base-ui/react/separator`) and ships with default variant classes:
+- Horizontal: `data-horizontal:w-full data-horizontal:h-px`
+- Vertical: `data-vertical:w-px data-vertical:self-stretch`
+
+Because `data-vertical:*` and `data-horizontal:*` use data-attribute selectors in Tailwind v4 (`[data-vertical]`), they possess higher CSS specificity than bare utility classes (`self-center`, `w-auto`). This causes common visual bugs if not overridden properly:
+
+1. **Vertical Separators in Flex Containers (`orientation="vertical"`)**:
+   - **Bug**: Writing `<Separator orientation="vertical" className="h-4" />` causes `data-vertical:self-stretch` to win, pinning the 16px line to the top cross-axis edge (0px) instead of vertically centering it.
+   - **Fix**: Use auto margins (`my-auto`) and override the vertical variant explicitly:
+     ```tsx
+     <Separator
+       orientation="vertical"
+       className="mx-1 h-4 my-auto self-center data-vertical:h-4 data-vertical:self-center"
+     />
+     ```
+     Auto margin (`my-auto`) absorbs all cross-axis free space in CSS Flexbox prior to alignment properties, guaranteeing pixel-perfect vertical centering.
+
+2. **Horizontal Separators with Horizontal Margins (`className="mx-*"`)**:
+   - **Bug**: Writing `<Separator className="mx-2" />` causes `data-horizontal:w-full` (100% width) to combine with margins, creating an 8px overflow beyond the container's right edge.
+   - **Fix**: Override width with `w-auto data-horizontal:w-auto`:
+     ```tsx
+     <Separator className="mx-2 w-auto data-horizontal:w-auto" />
+     ```
+
 ## Banned Patterns
 
 - Arbitrary class values (`text-[10px]`, `w-[450px]`, `p-[15px]`, `min-h-[500px]`, `z-[999]`).
@@ -98,3 +124,4 @@ Rules:
 - `space-x/y-*` when `gap-*` works.
 - Manual `dark:` overrides when semantic tokens already adapt.
 - Custom keyframes when built-in utilities suffice.
+- Bare `<Separator orientation="vertical" className="h-4" />` without `my-auto` / `data-vertical:self-center`.
