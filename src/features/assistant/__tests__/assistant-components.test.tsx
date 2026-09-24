@@ -5,43 +5,14 @@ import { AssistantWelcome } from "../components/assistant-welcome";
 import { Assistant } from "../index";
 
 describe("AssistantWelcome", () => {
-	it("renders commands and context information", () => {
-		const onSelectPrompt = vi.fn();
-		render(
-			<AssistantWelcome
-				context={{
-					experimentId: "exp-1",
-					title: "Smart Meter Trial",
-					inquiriesCount: 3,
-					service: "temporary",
-				}}
-				onSelectPrompt={onSelectPrompt}
-			/>,
-		);
+	it("renders an empty state without mock commands", () => {
+		render(<AssistantWelcome />);
 
-		expect(screen.getByText("Smart Meter Trial")).toBeDefined();
-		expect(
-			screen.getByText(
-				"Investigate experiments, analyze performance, or run actions.",
-			),
-		).toBeDefined();
-		expect(screen.getByText("/analyze")).toBeDefined();
-		expect(screen.getByText("/cases")).toBeDefined();
-	});
-
-	it("triggers prompt selection callback when clicking command", () => {
-		const onSelectPrompt = vi.fn();
-		const { container } = render(
-			<AssistantWelcome onSelectPrompt={onSelectPrompt} />,
-		);
-
-		const cmdBtn = container.querySelector("button");
-		expect(cmdBtn).not.toBeNull();
-		if (cmdBtn) {
-			fireEvent.click(cmdBtn);
-		}
-
-		expect(onSelectPrompt).toHaveBeenCalledWith("/analyze");
+		expect(screen.getByText("Không có hội thoại nào đang mở.")).toBeDefined();
+		expect(screen.queryByText("/analyze")).toBeNull();
+		expect(screen.queryByText("/cases")).toBeNull();
+		expect(screen.queryByText("/inquiries")).toBeNull();
+		expect(screen.queryByText("/explain")).toBeNull();
 	});
 });
 

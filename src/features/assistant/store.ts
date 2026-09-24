@@ -5,6 +5,19 @@ export const DEFAULT_ASSISTANT_WIDTH = 384;
 export const MIN_ASSISTANT_WIDTH = 320;
 export const MAX_ASSISTANT_WIDTH = 720;
 
+// Xoá dữ liệu mock cũ còn đọng trong localStorage từ bản assistant demo (lưu
+// cả conversations/messages giả). Store mới chỉ lưu UI preference nên key cũ
+// không bao giờ được đọc lại — dọn để không còn cơ hội tái hiện.
+if (typeof window !== "undefined") {
+	for (const key of ["annobot_assistant_ui_v3", "annobot_assistant_ui_v2"]) {
+		try {
+			window.localStorage.removeItem(key);
+		} catch {
+			// ignore (e.g. private mode)
+		}
+	}
+}
+
 export interface AssistantUIState {
 	isOpen: boolean;
 	width: number;
