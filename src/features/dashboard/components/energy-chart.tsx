@@ -282,12 +282,7 @@ export const EnergyUsageChart = ({
 	};
 
 	return (
-		<Card
-			className={cn(
-				"flex flex-col border border-border/50 bg-card/60 overflow-visible",
-				className,
-			)}
-		>
+		<Card className={cn("flex flex-col overflow-visible", className)}>
 			{headerNode}
 
 			<CardContent
