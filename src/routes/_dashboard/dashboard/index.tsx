@@ -273,6 +273,17 @@ const HomePage = () => {
 							}
 							description={`${overview.events_last_24h.toLocaleString("en-US")} events received in the last 24h`}
 						/>
+						{overview.stale_sensors > 0 ? (
+							<StatBlock
+								icon={IconAlertTriangle}
+								iconClassName="text-amber-500"
+								label="Stale sensors"
+								value={
+									<span className="font-mono">{overview.stale_sensors}</span>
+								}
+								description="Reporting a constant value for days (dead plug or mis-mapped entity). Excluded from detection."
+							/>
+						) : null}
 					</div>
 				</div>
 

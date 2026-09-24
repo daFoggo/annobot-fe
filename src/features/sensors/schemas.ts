@@ -10,6 +10,8 @@ export const SensorSchema = z.object({
 	zone: z.string().nullable(),
 	appliance_name: z.string().nullable(),
 	is_active: z.boolean(),
+	/** Readings constant over the lookback (dead plug / mis-map) — excluded from detection. */
+	is_stale: z.boolean().optional().default(false),
 	created_at: z.string(),
 	updated_at: z.string(),
 });

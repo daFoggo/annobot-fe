@@ -34,6 +34,8 @@ export const DashboardOverviewSchema = z.object({
 	active_power_meters_24h: z.number().int(),
 	active_power_devices_24h: z.number().int().optional(),
 	stale_sources_24h: z.number().int(),
+	/** Sensors flagged stale (constant readings) by the staleness scan. */
+	stale_sensors: z.number().int().optional().default(0),
 	energy_today_kwh: z.number().nullable(),
 	water_today_l: z.number().nullable().optional(),
 	last_data_at: z.string().nullable(),

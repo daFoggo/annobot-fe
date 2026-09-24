@@ -1,3 +1,4 @@
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,15 @@ export const SensorCard = ({
 						{sensor.unit ? ` · ${sensor.unit}` : ""}
 					</span>
 				</div>
+				{sensor.is_stale ? (
+					<Badge
+						variant="outline"
+						className="shrink-0 gap-1 border-amber-500/50 text-amber-600 dark:text-amber-500"
+					>
+						<IconAlertTriangle className="size-3" />
+						Stale
+					</Badge>
+				) : null}
 				{sensor.zone ? (
 					<Badge variant="secondary" className="shrink-0">
 						{sensor.zone}
