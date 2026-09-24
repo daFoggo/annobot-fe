@@ -1,8 +1,9 @@
 import { IconPlayerPlay } from "@tabler/icons-react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DashboardPage } from "@/components/layout/dashboard";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { getMeQueryOptions } from "@/features/auth";
 import {
@@ -41,8 +43,16 @@ import {
 	median,
 	useTriggerDetection,
 } from "@/features/cases";
+import {
+	EnergyUsageChart,
+	energyChartQueryOptions,
+	last24hWindow,
+	RESOURCE_EVENT_TYPES,
+	type ResourceConsumptionType,
+} from "@/features/dashboard";
 import { inquiryListQueryOptions } from "@/features/inquiries";
 import { getSensorIcon } from "@/features/sensors";
+import { getErrorMessage } from "@/lib/error";
 import { resolveTimezone, useTimezoneStore } from "@/stores/timezone";
 
 const ALL = "all";
@@ -109,6 +119,9 @@ const ExperimentCasesPage = () => {
 	const { data: user } = useSuspenseQuery(getMeQueryOptions());
 	const tzChoice = useTimezoneStore((state) => state.choice);
 	const timezone = resolveTimezone(tzChoice, user?.timezone || "UTC");
+	const { range } = Route.useLoaderData();
+	const [resourceType, setResourceType] =
+		useState<ResourceConsumptionType>("power");
 
 	const selected = inquiryParam ?? ALL;
 	const inquiryId = selected === ALL ? undefined : selected;
@@ -117,6 +130,37 @@ const ExperimentCasesPage = () => {
 		() => inquiries.find((item) => item.id === inquiryId) ?? null,
 		[inquiries, inquiryId],
 	);
+
+	// Sensor source keys của inquiry đang chọn — chart chỉ vẽ các sensor này.
+	const inquirySourceKeys = useMemo(
+		() => activeInquiry?.sensors.map((sensor) => sensor.source_key) ?? [],
+		[activeInquiry],
+	);
+
+	// source_key → tên thiết bị, cho nhãn hàng trong timeline.
+	const deviceNames = useMemo(() => {
+		const map: Record<string, string> = {};
+		for (const inquiry of inquiries) {
+			for (const sensor of inquiry.sensors) {
+				map[sensor.source_key] = sensor.name || sensor.source_key;
+			}
+		}
+		return map;
+	}, [inquiries]);
+
+	const {
+		data: inquiryChart,
+		isPending: chartPending,
+		isError: chartError,
+		error: chartErrorValue,
+	} = useQuery({
+		...energyChartQueryOptions(
+			range,
+			RESOURCE_EVENT_TYPES[resourceType],
+			inquirySourceKeys,
+		),
+		enabled: Boolean(activeInquiry),
+	});
 
 	// Câu hỏi của inquiry dài cả dòng nên tab không dùng được. Dropdown thì hợp,
 	// nhưng trigger phải là chính tiêu đề card (như select đổi loại tiêu thụ ở
@@ -276,6 +320,26 @@ const ExperimentCasesPage = () => {
 					) : null}
 				</Card>
 
+				{activeInquiry ? (
+					chartError ? (
+						<Alert variant="destructive">
+							<AlertTitle>Could not load sensor data</AlertTitle>
+							<AlertDescription>
+								{getErrorMessage(chartErrorValue, "The chart request failed.")}
+							</AlertDescription>
+						</Alert>
+					) : chartPending || !inquiryChart ? (
+						<Skeleton className="h-96 w-full" />
+					) : (
+						<EnergyUsageChart
+							data={inquiryChart}
+							resourceType={resourceType}
+							onResourceTypeChange={setResourceType}
+							timezone={timezone}
+						/>
+					)
+				) : null}
+
 				<Card>
 					<CardContent>
 						<dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
@@ -293,7 +357,12 @@ const ExperimentCasesPage = () => {
 					</CardContent>
 				</Card>
 
-				<CaseTimeline cases={cases} timezone={timezone} isLoading={isLoading} />
+				<CaseTimeline
+					cases={cases}
+					timezone={timezone}
+					isLoading={isLoading}
+					deviceNames={deviceNames}
+				/>
 
 				<Card>
 					<CardHeader>
@@ -386,6 +455,8 @@ export const Route = createFileRoute(
 		await context.queryClient.query(
 			inquiryListQueryOptions(params.experimentId),
 		);
+		// Fixed window so the loader-rendered key matches the client chart query.
+		return { range: last24hWindow() };
 	},
 	component: ExperimentCasesPage,
 });
