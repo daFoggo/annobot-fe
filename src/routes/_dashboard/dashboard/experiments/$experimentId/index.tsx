@@ -6,8 +6,9 @@ import {
 } from "@tabler/icons-react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { DashboardPage } from "@/components/layout/dashboard";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,7 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { getMeQueryOptions } from "@/features/auth";
 import {
@@ -45,8 +47,17 @@ import {
 	countByStage,
 	useTriggerDetection,
 } from "@/features/cases";
+import {
+	EnergyUsageChart,
+	energyChartQueryOptions,
+	last24hWindow,
+	RESOURCE_EVENT_TYPES,
+	type ResourceConsumptionType,
+} from "@/features/dashboard";
 import { experimentDetailQueryOptions } from "@/features/experiments";
 import { inquiryListQueryOptions } from "@/features/inquiries";
+import { getErrorMessage } from "@/lib/error";
+import { cn } from "@/lib/utils";
 import { resolveTimezone, useTimezoneStore } from "@/stores/timezone";
 
 const day = (value: string | null | undefined) =>
@@ -107,6 +118,9 @@ const ExperimentOverviewPage = () => {
 	const { data: user } = useSuspenseQuery(getMeQueryOptions());
 	const tzChoice = useTimezoneStore((state) => state.choice);
 	const timezone = resolveTimezone(tzChoice, user?.timezone || "UTC");
+	const { range } = Route.useLoaderData();
+	const [resourceType, setResourceType] =
+		useState<ResourceConsumptionType>("power");
 
 	const { data: inquiries = [] } = useQuery(
 		inquiryListQueryOptions(experimentId),
@@ -119,6 +133,40 @@ const ExperimentOverviewPage = () => {
 		}),
 	);
 	const triggerDetection = useTriggerDetection(experimentId);
+
+	// Chỉ vẽ chart cho các sensor được gán cho bất kỳ inquiry nào của experiment.
+	const inquirySourceKeys = useMemo(() => {
+		const keys = new Set<string>();
+		for (const inquiry of inquiries) {
+			for (const sensor of inquiry.sensors) keys.add(sensor.source_key);
+		}
+		return [...keys];
+	}, [inquiries]);
+
+	// source_key → tên thiết bị, cho nhãn hàng trong timeline.
+	const deviceNames = useMemo(() => {
+		const map: Record<string, string> = {};
+		for (const inquiry of inquiries) {
+			for (const sensor of inquiry.sensors) {
+				map[sensor.source_key] = sensor.name || sensor.source_key;
+			}
+		}
+		return map;
+	}, [inquiries]);
+
+	const {
+		data: energyChart,
+		isPending: chartPending,
+		isError: chartError,
+		error: chartErrorValue,
+	} = useQuery({
+		...energyChartQueryOptions(
+			range,
+			RESOURCE_EVENT_TYPES[resourceType],
+			inquirySourceKeys,
+		),
+		enabled: inquirySourceKeys.length > 0,
+	});
 
 	const cases = useMemo(() => data?.founds ?? [], [data]);
 	const byInquiry = useMemo(() => {
@@ -137,6 +185,7 @@ const ExperimentOverviewPage = () => {
 
 	return (
 		<DashboardPage
+			size="full"
 			title={experiment.title}
 			description={
 				from && to
@@ -174,43 +223,84 @@ const ExperimentOverviewPage = () => {
 			}
 		>
 			<div className="flex flex-col gap-4">
-				{period ? (
-					<Card>
-						<CardHeader>
-							<div className="flex flex-wrap items-center justify-between gap-2">
-								<CardTitle className="text-sm">Listening period</CardTitle>
-								<Badge
-									variant={period.state === "running" ? "default" : "secondary"}
-								>
-									{PERIOD_LABEL[period.state]}
-								</Badge>
-							</div>
-							<CardDescription className="text-xs">
-								Time the experiment is allowed to collect data. It is elapsed
-								time, not a measure of how much has been detected.
-							</CardDescription>
-						</CardHeader>
-						<CardContent className="flex flex-col gap-2">
-							<Progress value={period.percent} />
-							<div className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs text-muted-foreground tabular-nums">
-								<span>
-									Day {period.elapsedDays} of {period.totalDays}
-								</span>
-								<span>
-									{period.state === "ended"
-										? "finished"
-										: period.state === "scheduled"
-											? `starts ${from}`
-											: `${period.remainingDays} days left`}
-								</span>
-							</div>
-						</CardContent>
-					</Card>
-				) : null}
+				<div className={cn("grid gap-4", period && "lg:grid-cols-2")}>
+					{period ? (
+						<Card>
+							<CardHeader>
+								<div className="flex flex-wrap items-center justify-between gap-2">
+									<CardTitle className="text-sm">Listening period</CardTitle>
+									<Badge
+										variant={
+											period.state === "running" ? "default" : "secondary"
+										}
+									>
+										{PERIOD_LABEL[period.state]}
+									</Badge>
+								</div>
+								<CardDescription className="text-xs">
+									Time the experiment is allowed to collect data. It is elapsed
+									time, not a measure of how much has been detected.
+								</CardDescription>
+							</CardHeader>
+							<CardContent className="flex flex-col gap-2">
+								<Progress value={period.percent} />
+								<div className="flex flex-wrap items-center justify-between gap-2 font-mono text-xs text-muted-foreground tabular-nums">
+									<span>
+										Day {period.elapsedDays} of {period.totalDays}
+									</span>
+									<span>
+										{period.state === "ended"
+											? "finished"
+											: period.state === "scheduled"
+												? `starts ${from}`
+												: `${period.remainingDays} days left`}
+									</span>
+								</div>
+							</CardContent>
+						</Card>
+					) : null}
 
-				<CaseFunnel cases={cases} />
+					<CaseFunnel cases={cases} />
+				</div>
 
-				<CaseTimeline cases={cases} timezone={timezone} isLoading={isLoading} />
+				<div
+					className={cn(
+						"grid gap-4",
+						inquirySourceKeys.length > 0 && "lg:grid-cols-2",
+					)}
+				>
+					{inquirySourceKeys.length > 0 ? (
+						chartError ? (
+							<Alert variant="destructive">
+								<AlertTitle>Could not load sensor data</AlertTitle>
+								<AlertDescription>
+									{getErrorMessage(
+										chartErrorValue,
+										"The chart request failed.",
+									)}
+								</AlertDescription>
+							</Alert>
+						) : chartPending || !energyChart ? (
+							<Skeleton className="h-96 w-full" />
+						) : (
+							<EnergyUsageChart
+								data={energyChart}
+								resourceType={resourceType}
+								onResourceTypeChange={setResourceType}
+								variant="compact"
+								timezone={timezone}
+							/>
+						)
+					) : null}
+
+					<CaseTimeline
+						cases={cases}
+						timezone={timezone}
+						isLoading={isLoading}
+						fillChart
+						deviceNames={deviceNames}
+					/>
+				</div>
 
 				<Card>
 					<CardHeader>
@@ -320,6 +410,8 @@ export const Route = createFileRoute(
 			),
 			context.queryClient.query(inquiryListQueryOptions(params.experimentId)),
 		]);
+		// Fixed window so the loader-rendered key matches the client chart query.
+		return { range: last24hWindow() };
 	},
 	component: ExperimentOverviewPage,
 });

@@ -71,6 +71,7 @@ export const CaseSchema = z.object({
 	indicators: z.array(CaseIndicatorSchema).default([]),
 	asks: z.array(CaseAskSchema).default([]),
 	rule_change: RuleChangeSchema.nullable().optional(),
+	metadata: z.record(z.string(), z.any()).nullable().optional(),
 });
 
 export type Case = z.infer<typeof CaseSchema>;

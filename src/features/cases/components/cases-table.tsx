@@ -1,4 +1,5 @@
-import { IconInbox } from "@tabler/icons-react";
+import { IconInbox, IconSparkles } from "@tabler/icons-react";
+import { Button } from "@/components/ui/button";
 import {
 	Empty,
 	EmptyDescription,
@@ -15,11 +16,23 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { durationMinutes, indicatorValue } from "../lifecycle";
 import type { Case } from "../schemas";
 import { CaseEvidenceDialog } from "./case-evidence-dialog";
 import { CaseStatusBadge } from "./case-status-badge";
 import { RuleChangeBadge } from "./rule-change-badge";
+
+/** Cột có thể ẩn/hiện; `started` luôn hiển thị để giữ mốc thời gian. */
+export const CASE_COLUMNS = [
+	{ id: "started", label: "Started" },
+	{ id: "duration", label: "Duration" },
+	{ id: "energy", label: "Energy" },
+	{ id: "peak", label: "Peak" },
+	{ id: "status", label: "Status" },
+] as const;
+
+export type CaseColumnId = (typeof CASE_COLUMNS)[number]["id"];
 
 const stampCache = new Map<string, Intl.DateTimeFormat>();
 
@@ -72,6 +85,12 @@ export interface CasesTableProps {
 	cases: Case[];
 	timezone?: string;
 	isLoading?: boolean;
+	/** Case đang mở trong copilot panel, để tô nền hàng tương ứng. */
+	activeCaseId?: string;
+	/** Có mặt thì bảng hiện nút mở copilot cho từng hàng. */
+	onSelect?: (item: Case) => void;
+	/** Cột đang hiển thị; mặc định tất cả. */
+	visibleColumns?: CaseColumnId[];
 }
 
 /**
@@ -86,7 +105,12 @@ export const CasesTable = ({
 	cases,
 	timezone = "UTC",
 	isLoading,
+	activeCaseId,
+	onSelect,
+	visibleColumns,
 }: CasesTableProps) => {
+	const showColumns = visibleColumns ?? CASE_COLUMNS.map((c) => c.id);
+	const show = (id: CaseColumnId) => showColumns.includes(id);
 	if (isLoading) {
 		return (
 			<div className="flex flex-col gap-1.5">
@@ -119,39 +143,57 @@ export const CasesTable = ({
 		<Table>
 			<TableHeader>
 				<TableRow>
-					<TableHead>Started</TableHead>
-					<TableHead>Duration</TableHead>
-					<TableHead>Energy</TableHead>
-					<TableHead>Peak</TableHead>
-					<TableHead>Status</TableHead>
+					{show("started") ? <TableHead>Started</TableHead> : null}
+					{show("duration") ? <TableHead>Duration</TableHead> : null}
+					{show("energy") ? <TableHead>Energy</TableHead> : null}
+					{show("peak") ? <TableHead>Peak</TableHead> : null}
+					{show("status") ? <TableHead>Status</TableHead> : null}
 					<TableHead className="w-10" />
+					{onSelect ? <TableHead className="w-10" /> : null}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
 				{cases.map((item) => (
-					<TableRow key={item.id}>
-						<TableCell className="font-mono tabular-nums">
-							{stamp(item.t_start, timezone)}
-						</TableCell>
-						<TableCell className="font-mono tabular-nums">
-							{duration(item)}
-						</TableCell>
-						<TableCell className="font-mono tabular-nums">
-							{energy(item)}
-						</TableCell>
-						<TableCell className="font-mono tabular-nums">
-							{peak(item)}
-						</TableCell>
-						<TableCell>
-							<div className="flex flex-wrap items-center gap-1.5">
-								<CaseStatusBadge status={item.status} />
-								<RuleChangeBadge
-									item={item}
-									timeLabel={stamp(item.t_start, timezone)}
-								/>
-							</div>
-						</TableCell>
-						<TableCell>
+					<TableRow
+						key={item.id}
+						className={cn(
+							onSelect && "cursor-pointer hover:bg-muted/50 transition-colors",
+							item.id === activeCaseId && "bg-muted font-medium hover:bg-muted",
+						)}
+						onClick={() => onSelect?.(item)}
+					>
+						{show("started") ? (
+							<TableCell className="font-mono tabular-nums">
+								{stamp(item.t_start, timezone)}
+							</TableCell>
+						) : null}
+						{show("duration") ? (
+							<TableCell className="font-mono tabular-nums">
+								{duration(item)}
+							</TableCell>
+						) : null}
+						{show("energy") ? (
+							<TableCell className="font-mono tabular-nums">
+								{energy(item)}
+							</TableCell>
+						) : null}
+						{show("peak") ? (
+							<TableCell className="font-mono tabular-nums">
+								{peak(item)}
+							</TableCell>
+						) : null}
+						{show("status") ? (
+							<TableCell>
+								<div className="flex flex-wrap items-center gap-1.5">
+									<CaseStatusBadge status={item.status} />
+									<RuleChangeBadge
+										item={item}
+										timeLabel={stamp(item.t_start, timezone)}
+									/>
+								</div>
+							</TableCell>
+						) : null}
+						<TableCell onClick={(event) => event.stopPropagation()}>
 							<CaseEvidenceDialog
 								item={item}
 								timeLabel={`${stamp(item.t_start, timezone)}${
@@ -159,6 +201,18 @@ export const CasesTable = ({
 								}`}
 							/>
 						</TableCell>
+						{onSelect ? (
+							<TableCell onClick={(event) => event.stopPropagation()}>
+								<Button
+									variant={item.id === activeCaseId ? "secondary" : "ghost"}
+									size="icon-sm"
+									aria-label="Mở trong copilot"
+									onClick={() => onSelect(item)}
+								>
+									<IconSparkles />
+								</Button>
+							</TableCell>
+						) : null}
 					</TableRow>
 				))}
 			</TableBody>
