@@ -108,8 +108,13 @@ export interface EnergyUsageChartProps {
 	resourceType?: ResourceConsumptionType;
 	onResourceTypeChange?: (type: ResourceConsumptionType) => void;
 	className?: string;
-	/** Height class for the plot area; defaults to `h-80` (full-page charts). */
+	/** Height class for the plot area; defaults to `h-80` (or `h-40` compact). */
 	chartAreaClassName?: string;
+	/**
+	 * `default`: full house chart. `compact`: shorter plot + tighter chrome, for
+	 * embedding next to another card (experiment overview).
+	 */
+	variant?: "default" | "compact";
 	/** Effective IANA zone used to format axis/tooltip/header labels. */
 	timezone?: string;
 }
@@ -124,10 +129,13 @@ export const EnergyUsageChart = ({
 	resourceType = "power",
 	onResourceTypeChange,
 	className,
-	chartAreaClassName = "h-80",
+	chartAreaClassName,
+	variant = "default",
 	timezone,
 }: EnergyUsageChartProps) => {
 	const zone = timezone ?? "UTC";
+	const compact = variant === "compact";
+	const chartClass = chartAreaClassName ?? (compact ? "h-40" : "h-80");
 	const [mode, setMode] = useState<ViewMode>("stack");
 	const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
 	const [range, setRange] = useState<{
@@ -186,7 +194,12 @@ export const EnergyUsageChart = ({
 								}
 							}}
 						>
-							<SelectTrigger className="h-auto w-fit border-none bg-transparent p-0 pr-1 gap-1 text-base sm:text-lg font-semibold tracking-tight text-foreground shadow-none ring-0 outline-none hover:bg-transparent focus:ring-0 focus-visible:ring-0 focus-visible:border-none focus-visible:outline-none dark:bg-transparent dark:hover:bg-transparent cursor-pointer [&_svg]:size-4 [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground">
+							<SelectTrigger
+								className={cn(
+									"h-auto w-fit border-none bg-transparent p-0 pr-1 gap-1 font-semibold tracking-tight text-foreground shadow-none ring-0 outline-none hover:bg-transparent focus:ring-0 focus-visible:ring-0 focus-visible:border-none focus-visible:outline-none dark:bg-transparent dark:hover:bg-transparent cursor-pointer [&_svg]:size-4 [&_svg]:text-muted-foreground hover:[&_svg]:text-foreground",
+									compact ? "text-sm sm:text-base" : "text-base sm:text-lg",
+								)}
+							>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent align="start" className="min-w-44">
@@ -200,7 +213,12 @@ export const EnergyUsageChart = ({
 							</SelectContent>
 						</Select>
 					) : (
-						<CardTitle className="text-base font-semibold sm:text-lg">
+						<CardTitle
+							className={cn(
+								"font-semibold",
+								compact ? "text-sm sm:text-base" : "text-base sm:text-lg",
+							)}
+						>
 							{resourceTitle}
 						</CardTitle>
 					)}
@@ -272,30 +290,77 @@ export const EnergyUsageChart = ({
 		>
 			{headerNode}
 
-			<CardContent className="flex flex-1 flex-col gap-4 overflow-visible">
-				<div className="grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-muted/20 p-2.5">
-					<div className="flex flex-col gap-0.5 px-3">
-						<span className="text-[11px] font-mono tracking-wider text-muted-foreground uppercase">
+			<CardContent
+				className={cn(
+					"flex flex-1 flex-col overflow-visible",
+					compact ? "gap-2.5" : "gap-4",
+				)}
+			>
+				<div
+					className={cn(
+						"grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-muted/20",
+						compact ? "p-1.5" : "p-2.5",
+					)}
+				>
+					<div
+						className={cn("flex flex-col gap-0.5", compact ? "px-2" : "px-3")}
+					>
+						<span
+							className={cn(
+								"font-mono tracking-wider text-muted-foreground uppercase",
+								compact ? "text-[10px]" : "text-[11px]",
+							)}
+						>
 							Current
 						</span>
-						<span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+						<span
+							className={cn(
+								"font-mono font-semibold text-foreground tabular-nums",
+								compact ? "text-xs" : "text-sm",
+							)}
+						>
 							{hasSeries ? formatUnit(stats.current, effectiveUnit) : "—"}
 						</span>
 					</div>
-					<div className="flex flex-col gap-0.5 px-3">
-						<span className="text-[11px] font-mono tracking-wider text-muted-foreground uppercase">
+					<div
+						className={cn("flex flex-col gap-0.5", compact ? "px-2" : "px-3")}
+					>
+						<span
+							className={cn(
+								"font-mono tracking-wider text-muted-foreground uppercase",
+								compact ? "text-[10px]" : "text-[11px]",
+							)}
+						>
 							Peak
 						</span>
-						<span className="font-mono text-sm font-semibold text-foreground tabular-nums">
+						<span
+							className={cn(
+								"font-mono font-semibold text-foreground tabular-nums",
+								compact ? "text-xs" : "text-sm",
+							)}
+						>
 							{hasSeries ? formatUnit(stats.peak, effectiveUnit) : "—"}
 						</span>
 					</div>
-					<div className="flex min-w-0 flex-col gap-0.5 px-3">
-						<span className="text-[11px] font-mono tracking-wider text-muted-foreground uppercase">
+					<div
+						className={cn(
+							"flex min-w-0 flex-col gap-0.5",
+							compact ? "px-2" : "px-3",
+						)}
+					>
+						<span
+							className={cn(
+								"font-mono tracking-wider text-muted-foreground uppercase",
+								compact ? "text-[10px]" : "text-[11px]",
+							)}
+						>
 							Top consumer
 						</span>
 						<span
-							className="truncate font-mono text-sm font-semibold text-foreground tabular-nums"
+							className={cn(
+								"truncate font-mono font-semibold text-foreground tabular-nums",
+								compact ? "text-xs" : "text-sm",
+							)}
 							title={hasSeries ? stats.topName : undefined}
 						>
 							{hasSeries ? stats.topName : "—"}
@@ -303,7 +368,7 @@ export const EnergyUsageChart = ({
 					</div>
 				</div>
 
-				<div className={cn("relative aspect-auto w-full", chartAreaClassName)}>
+				<div className={cn("relative aspect-auto w-full", chartClass)}>
 					<ChartContainer config={config} className="h-full w-full">
 						<ComposedChart
 							accessibilityLayer
@@ -374,7 +439,7 @@ export const EnergyUsageChart = ({
 							{hasSeries ? (
 								<Brush
 									dataKey="ts"
-									height={24}
+									height={compact ? 16 : 24}
 									travellerWidth={8}
 									fill="var(--muted)"
 									stroke="var(--border)"
@@ -402,7 +467,12 @@ export const EnergyUsageChart = ({
 					) : null}
 				</div>
 
-				<div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/10 p-2.5">
+				<div
+					className={cn(
+						"flex flex-col gap-2 rounded-lg border border-border bg-muted/10",
+						compact ? "p-2" : "p-2.5",
+					)}
+				>
 					<div className="flex items-center justify-between gap-2">
 						<div className="flex items-center gap-2">
 							<span className="text-[11px] font-mono font-medium tracking-wider text-muted-foreground uppercase">
@@ -452,7 +522,12 @@ export const EnergyUsageChart = ({
 						</div>
 					</div>
 
-					<div className="scroll-fade-y max-h-20 w-full overflow-y-auto">
+					<div
+						className={cn(
+							"scroll-fade-y w-full overflow-y-auto scrollbar-none",
+							compact ? "max-h-14" : "max-h-20",
+						)}
+					>
 						{hasSeries ? (
 							<div className="flex flex-wrap items-center gap-1.5 pr-3 py-1">
 								{series.map((item, index) => {
