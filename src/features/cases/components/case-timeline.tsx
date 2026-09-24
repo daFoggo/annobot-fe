@@ -1,6 +1,5 @@
 import { IconCalendarEvent } from "@tabler/icons-react";
-import { useMemo, useState } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
+import { Fragment, useMemo, useState } from "react";
 import {
 	Card,
 	CardContent,
@@ -8,11 +7,6 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import {
-	type ChartConfig,
-	ChartContainer,
-	ChartTooltip,
-} from "@/components/ui/chart";
 import {
 	Empty,
 	EmptyDescription,
@@ -22,21 +16,46 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { type CaseStage, STAGE_ORDER, stageMeta, stageOf } from "../lifecycle";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { type CaseStage, stageMeta, stageOf } from "../lifecycle";
 import type { Case } from "../schemas";
 import { StageDot } from "./case-status-badge";
 
 /**
- * Trục ngang là giờ trong ngày, mỗi hàng là một ngày, mỗi dải là một lần thiết
- * bị chạy.
+ * Heatmap ngày × giờ: mỗi hàng là một ngày, mỗi ô là một giờ, độ đậm thể hiện số
+ * phút có thiết bị chạy trong giờ đó.
  *
- * Case là *khoảng* `[t_start, t_end]` chứ không phải điểm, nên hình đúng của nó
- * là dải thời gian, không phải đường. Xếp theo ngày làm lộ ra nhịp sinh hoạt —
- * đúng thứ mà các inquiry đang hỏi ("phòng họp dùng khi nào", "lò vi sóng dùng
- * khung giờ nào").
+ * Case là *khoảng* `[t_start, t_end]`, nên thay vì vẽ dải chồng nhau (dễ rối và
+ * lệch khi nhiều thiết bị chạy song song), ta cộng dồn thời lượng hoạt động vào
+ * từng ô giờ. Nhịp sinh hoạt — "phòng họp dùng khung giờ nào" — hiện ra rõ hơn
+ * nhiều, và data thưa vẫn nhìn được.
  */
 
 const HOURS_IN_DAY = 24;
+const HOURS = Array.from({ length: HOURS_IN_DAY }, (_, hour) => hour);
+const GRID_COLUMNS = `2.75rem repeat(${HOURS_IN_DAY}, minmax(0, 1fr))`;
+
+/** Mức đậm theo số phút hoạt động trong một ô giờ. */
+const LEVEL_CLASSES = [
+	"bg-muted/40",
+	"bg-primary/20",
+	"bg-primary/40",
+	"bg-primary/65",
+	"bg-primary/90",
+] as const;
+
+const levelFor = (minutes: number) => {
+	if (minutes <= 0) return 0;
+	if (minutes < 10) return 1;
+	if (minutes < 25) return 2;
+	if (minutes < 45) return 3;
+	return 4;
+};
 
 interface Band {
 	/** Giờ bắt đầu trong ngày, dạng thập phân (9.5 = 09:30). */
@@ -52,7 +71,11 @@ interface DayRow {
 	label: string;
 	bands: Band[];
 	totalMinutes: number;
-	[segment: string]: unknown;
+}
+
+interface HourCell {
+	minutes: number;
+	runs: Band[];
 }
 
 const zonedFormatter = new Map<string, Intl.DateTimeFormat>();
@@ -85,9 +108,6 @@ const dayLabel = (key: string) => {
 	return `${day}/${month}`;
 };
 
-const hourLabel = (value: number) =>
-	`${String(Math.floor(value)).padStart(2, "0")}:00`;
-
 const formatDuration = (minutes: number) => {
 	if (minutes < 60) return `${Math.round(minutes)} min`;
 	const hours = Math.floor(minutes / 60);
@@ -95,13 +115,16 @@ const formatDuration = (minutes: number) => {
 	return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 };
 
+const hhmm = (value: number) => {
+	const hours = Math.floor(value);
+	const minutes = Math.round((value - hours) * 60);
+	return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+};
+
 /**
- * Cắt mỗi case theo ranh giới ngày rồi gộp các dải chồng nhau.
- *
- * Gộp là cần thiết: trong một inquiry có nhiều cảm biến, hai thiết bị có thể
- * chạy cùng lúc. Vẽ chồng lên nhau trong một hàng sẽ sai, còn đẩy lệch đi thì
- * bóp méo thời gian thật. Dải gộp mang nghĩa "có hoạt động", và tooltip liệt kê
- * đầy đủ các case bên dưới nó.
+ * Cắt mỗi case theo ranh giới ngày rồi gộp các dải chồng nhau. Gộp là cần thiết:
+ * trong một inquiry có nhiều cảm biến, hai thiết bị có thể chạy cùng lúc; dải gộp
+ * mang nghĩa "có hoạt động", còn tooltip liệt kê đầy đủ các case bên dưới nó.
  */
 const buildRows = (cases: Case[], timeZone: string): DayRow[] => {
 	const perDay = new Map<string, Band[]>();
@@ -135,7 +158,7 @@ const buildRows = (cases: Case[], timeZone: string): DayRow[] => {
 		.sort(([a], [b]) => a.localeCompare(b))
 		.map(([key, raw]) => {
 			const bands = mergeOverlapping(raw);
-			const row: DayRow = {
+			return {
 				key,
 				label: dayLabel(key),
 				bands,
@@ -144,14 +167,6 @@ const buildRows = (cases: Case[], timeZone: string): DayRow[] => {
 					0,
 				),
 			};
-			let cursor = 0;
-			bands.forEach((band, index) => {
-				row[`gap${index}`] = Math.max(band.start - cursor, 0);
-				// Sàn 0.1 giờ (6 phút) để một case rất ngắn vẫn nhìn thấy được.
-				row[`run${index}`] = Math.max(band.end - band.start, 0.1);
-				cursor = band.end;
-			});
-			return row;
 		});
 };
 
@@ -178,9 +193,16 @@ const mergeOverlapping = (bands: Band[]): Band[] => {
 	return merged;
 };
 
-const bandColor = (band: Band | undefined) => {
-	if (!band) return "transparent";
-	return band.stage ? stageMeta(band.stage).color : "var(--muted-foreground)";
+/** Tổng phút hoạt động và các lần chạy rơi vào một ô giờ. */
+const cellFor = (bands: Band[], hour: number): HourCell => {
+	const runs = bands.filter((band) => band.start < hour + 1 && band.end > hour);
+	let minutes = 0;
+	for (const band of runs) {
+		const from = Math.max(band.start, hour);
+		const to = Math.min(band.end, hour + 1);
+		if (to > from) minutes += (to - from) * 60;
+	}
+	return { minutes, runs };
 };
 
 export interface CaseTimelineProps {
@@ -189,6 +211,8 @@ export interface CaseTimelineProps {
 	timezone?: string;
 	isLoading?: boolean;
 	className?: string;
+	/** Khi true, heatmap giãn theo chiều cao card (dùng trong grid 2 cột). */
+	fillChart?: boolean;
 }
 
 export const CaseTimeline = ({
@@ -196,29 +220,25 @@ export const CaseTimeline = ({
 	timezone = "UTC",
 	isLoading,
 	className,
+	fillChart = false,
 }: CaseTimelineProps) => {
 	const [days, setDays] = useState<"7" | "14">("7");
 
 	const allRows = useMemo(() => buildRows(cases, timezone), [cases, timezone]);
 	const rows = useMemo(() => allRows.slice(-Number(days)), [allRows, days]);
 
-	const maxBands = rows.reduce(
-		(max, row) => Math.max(max, row.bands.length),
-		0,
-	);
-	const segments = Array.from({ length: maxBands }, (_, index) => index);
-
-	const stagesPresent = useMemo(() => {
-		const present = new Set<CaseStage>();
-		for (const row of rows)
-			for (const band of row.bands) if (band.stage) present.add(band.stage);
-		return STAGE_ORDER.filter((stage) => present.has(stage));
+	const cellsByDay = useMemo(() => {
+		const map = new Map<string, HourCell[]>();
+		for (const row of rows) {
+			map.set(
+				row.key,
+				Array.from({ length: HOURS_IN_DAY }, (_, hour) =>
+					cellFor(row.bands, hour),
+				),
+			);
+		}
+		return map;
 	}, [rows]);
-
-	const config = useMemo<ChartConfig>(
-		() => ({ activity: { label: "Activity" } }),
-		[],
-	);
 
 	if (isLoading) {
 		return (
@@ -258,11 +278,13 @@ export const CaseTimeline = ({
 					) : null}
 				</div>
 				<CardDescription className="font-mono text-xs">
-					One row per day · one band per run · {timezone}
+					One row per day · shading = active minutes · {timezone}
 				</CardDescription>
 			</CardHeader>
 
-			<CardContent className="flex flex-col gap-4">
+			<CardContent
+				className={cn("flex flex-col gap-3", fillChart && "min-h-0 flex-1")}
+			>
 				{rows.length === 0 ? (
 					<Empty>
 						<EmptyHeader>
@@ -278,85 +300,67 @@ export const CaseTimeline = ({
 					</Empty>
 				) : (
 					<>
-						<ChartContainer
-							config={config}
-							className={days === "7" ? "h-56 w-full" : "h-96 w-full"}
+						<div
+							className={cn(
+								"flex flex-col gap-1",
+								fillChart && "min-h-0 flex-1",
+							)}
 						>
-							<BarChart
-								accessibilityLayer
-								layout="vertical"
-								data={rows}
-								margin={{ top: 4, right: 12, bottom: 4, left: 4 }}
-								barCategoryGap="28%"
+							<div
+								className="grid gap-0.5"
+								style={{ gridTemplateColumns: GRID_COLUMNS }}
 							>
-								<CartesianGrid horizontal={false} />
-								<XAxis
-									type="number"
-									domain={[0, HOURS_IN_DAY]}
-									ticks={[0, 6, 12, 18, 24]}
-									tickLine={false}
-									axisLine={false}
-									tickMargin={8}
-									tickFormatter={hourLabel}
-								/>
-								<YAxis
-									type="category"
-									dataKey="label"
-									tickLine={false}
-									axisLine={false}
-									width={48}
-									tickMargin={8}
-								/>
-								{/*
-								 * Không đặt `cursor` thủ công: `ChartContainer` đã tô
-								 * `.recharts-rectangle.recharts-tooltip-cursor` bằng `fill-muted`.
-								 * Truyền thêm `fillOpacity` chỉ làm vạch highlight mờ tới mức
-								 * không còn nhìn thấy khi hover.
-								 */}
-								<ChartTooltip
-									cursor={{
-										fill: "var(--accent)",
-										stroke: "var(--muted-foreground)",
-										strokeOpacity: 0.5,
-									}}
-									content={<DayTooltip />}
-								/>
-								{segments.map((index) => [
-									<Bar
-										key={`gap${index}`}
-										dataKey={`gap${index}`}
-										stackId="day"
-										fill="transparent"
-										isAnimationActive={false}
-									/>,
-									<Bar
-										key={`run${index}`}
-										dataKey={`run${index}`}
-										stackId="day"
-										radius={4}
-										isAnimationActive={false}
-									>
-										{rows.map((row) => (
-											<Cell key={row.key} fill={bandColor(row.bands[index])} />
-										))}
-									</Bar>,
-								])}
-							</BarChart>
-						</ChartContainer>
-
-						{stagesPresent.length > 0 ? (
-							<div className="flex flex-wrap items-center gap-3">
-								{stagesPresent.map((stage) => (
+								<span aria-hidden />
+								{HOURS.map((hour) => (
 									<span
-										key={stage}
-										className="flex items-center gap-1.5 text-xs text-muted-foreground"
+										key={hour}
+										className="text-center font-mono text-[10px] text-muted-foreground tabular-nums"
 									>
-										<StageDot stage={stage} />
-										{stageMeta(stage).label}
+										{hour % 6 === 0 ? String(hour).padStart(2, "0") : ""}
 									</span>
 								))}
 							</div>
-						) : null}
+
+							<div
+								className={cn("grid gap-0.5", fillChart && "min-h-0 flex-1")}
+								style={{
+									gridTemplateColumns: GRID_COLUMNS,
+									gridTemplateRows: `repeat(${rows.length}, minmax(1.25rem, 1fr))`,
+								}}
+							>
+								{rows.map((row) => (
+									<Fragment key={row.key}>
+										<span className="flex items-center justify-end pr-1 font-mono text-[10px] text-muted-foreground tabular-nums">
+											{row.label}
+										</span>
+										{HOURS.map((hour) => (
+											<HeatCell
+												key={hour}
+												row={row}
+												hour={hour}
+												cell={
+													cellsByDay.get(row.key)?.[hour] ?? {
+														minutes: 0,
+														runs: [],
+													}
+												}
+											/>
+										))}
+									</Fragment>
+								))}
+							</div>
+						</div>
+
+						<div className="flex items-center justify-end gap-1.5 text-[11px] text-muted-foreground">
+							<span className="mr-0.5">Less</span>
+							{([1, 2, 3, 4] as const).map((level) => (
+								<span
+									key={level}
+									className={cn("size-3 rounded-[3px]", LEVEL_CLASSES[level])}
+								/>
+							))}
+							<span className="ml-0.5">More</span>
+						</div>
 					</>
 				)}
 			</CardContent>
@@ -364,55 +368,82 @@ export const CaseTimeline = ({
 	);
 };
 
-interface DayTooltipProps {
-	active?: boolean;
-	payload?: { payload: DayRow }[];
-}
+const HeatCell = ({
+	row,
+	hour,
+	cell,
+}: {
+	row: DayRow;
+	hour: number;
+	cell: HourCell;
+}) => {
+	const level = levelFor(cell.minutes);
+	const base = cn("h-full w-full rounded-[3px]", LEVEL_CLASSES[level]);
 
-/** Tooltip theo hàng: tóm tắt cả ngày rồi liệt kê từng lần chạy. */
-const DayTooltip = ({ active, payload }: DayTooltipProps) => {
-	const row = payload?.[0]?.payload;
-	if (!active || !row) return null;
+	if (level === 0) {
+		return <div className={base} aria-hidden />;
+	}
 
-	const caseCount = row.bands.reduce((sum, band) => sum + band.cases.length, 0);
+	const stages = [
+		...new Set(
+			cell.runs
+				.map((run) => run.stage)
+				.filter((stage): stage is CaseStage => Boolean(stage)),
+		),
+	];
 
 	return (
-		<div className="grid min-w-52 gap-2 rounded-lg border border-border bg-popover p-3 text-xs shadow-md">
-			<div className="flex items-center justify-between gap-4">
-				<span className="font-medium text-popover-foreground">{row.label}</span>
-				<span className="font-mono text-muted-foreground tabular-nums">
-					{caseCount} runs · {formatDuration(row.totalMinutes)}
-				</span>
-			</div>
-			<div className="grid gap-1">
-				{row.bands.slice(0, 6).map((band) => (
+		<Tooltip>
+			<TooltipTrigger
+				render={
 					<div
-						key={`${band.start}-${band.end}`}
-						className="flex items-center justify-between gap-4"
-					>
-						<span className="flex items-center gap-1.5 text-muted-foreground">
-							{band.stage ? <StageDot stage={band.stage} /> : null}
-							<span className="font-mono tabular-nums">
-								{hhmm(band.start)} – {hhmm(band.end)}
-							</span>
-						</span>
-						<span className="font-mono text-popover-foreground tabular-nums">
-							{formatDuration((band.end - band.start) * 60)}
-						</span>
-					</div>
-				))}
-				{row.bands.length > 6 ? (
-					<span className="text-muted-foreground">
-						and {row.bands.length - 6} more
+						className={cn(
+							base,
+							"cursor-default transition-shadow hover:ring-2 hover:ring-ring/60",
+						)}
+					/>
+				}
+			/>
+			<TooltipContent side="top" className="text-xs">
+				<div className="grid gap-1">
+					<span className="font-medium text-popover-foreground">
+						{row.label} · {hhmm(hour)}–{hhmm(hour + 1)}
 					</span>
-				) : null}
-			</div>
-		</div>
+					<span className="font-mono text-muted-foreground tabular-nums">
+						{formatDuration(cell.minutes)} active · {cell.runs.length} run
+						{cell.runs.length > 1 ? "s" : ""}
+					</span>
+					{stages.length > 0 ? (
+						<span className="flex flex-wrap items-center gap-2">
+							{stages.map((stage) => (
+								<span
+									key={stage}
+									className="flex items-center gap-1 text-muted-foreground"
+								>
+									<StageDot stage={stage} />
+									{stageMeta(stage).label}
+								</span>
+							))}
+						</span>
+					) : null}
+					<span className="grid gap-0.5">
+						{cell.runs.slice(0, 4).map((band) => (
+							<span
+								key={`${band.start}-${band.end}`}
+								className="font-mono text-muted-foreground tabular-nums"
+							>
+								{hhmm(band.start)} – {hhmm(band.end)} ·{" "}
+								{formatDuration((band.end - band.start) * 60)}
+							</span>
+						))}
+						{cell.runs.length > 4 ? (
+							<span className="text-muted-foreground">
+								and {cell.runs.length - 4} more
+							</span>
+						) : null}
+					</span>
+				</div>
+			</TooltipContent>
+		</Tooltip>
 	);
-};
-
-const hhmm = (value: number) => {
-	const hours = Math.floor(value);
-	const minutes = Math.round((value - hours) * 60);
-	return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 };
