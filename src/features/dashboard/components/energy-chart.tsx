@@ -28,7 +28,6 @@ import {
 	ChartTooltip,
 	ChartTooltipContent,
 } from "@/components/ui/chart";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Select,
 	SelectContent,
@@ -44,12 +43,8 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type {
-	EnergyChart,
-	ResourceConsumptionType,
-} from "@/features/dashboard";
-
 import { cn } from "@/lib/utils";
+import type { EnergyChart, ResourceConsumptionType } from "../schemas";
 
 /** Number of hue tokens available in `styles.css` (`--chart-1..10`). */
 const CHART_COLOR_COUNT = 10;
@@ -113,6 +108,8 @@ export interface EnergyUsageChartProps {
 	resourceType?: ResourceConsumptionType;
 	onResourceTypeChange?: (type: ResourceConsumptionType) => void;
 	className?: string;
+	/** Height class for the plot area; defaults to `h-80` (full-page charts). */
+	chartAreaClassName?: string;
 	/** Effective IANA zone used to format axis/tooltip/header labels. */
 	timezone?: string;
 }
@@ -127,6 +124,7 @@ export const EnergyUsageChart = ({
 	resourceType = "power",
 	onResourceTypeChange,
 	className,
+	chartAreaClassName = "h-80",
 	timezone,
 }: EnergyUsageChartProps) => {
 	const zone = timezone ?? "UTC";
@@ -305,7 +303,7 @@ export const EnergyUsageChart = ({
 					</div>
 				</div>
 
-				<div className="relative aspect-auto h-80 w-full">
+				<div className={cn("relative aspect-auto w-full", chartAreaClassName)}>
 					<ChartContainer config={config} className="h-full w-full">
 						<ComposedChart
 							accessibilityLayer
@@ -454,10 +452,7 @@ export const EnergyUsageChart = ({
 						</div>
 					</div>
 
-					<ScrollArea
-						className="scroll-fade-y h-20 w-full overflow-hidden"
-						viewportClassName="scroll-fade-y"
-					>
+					<div className="scroll-fade-y max-h-20 w-full overflow-y-auto">
 						{hasSeries ? (
 							<div className="flex flex-wrap items-center gap-1.5 pr-3 py-1">
 								{series.map((item, index) => {
@@ -500,7 +495,7 @@ export const EnergyUsageChart = ({
 								{isWater ? "No water meters connected" : "No devices recorded"}
 							</div>
 						)}
-					</ScrollArea>
+					</div>
 				</div>
 			</CardContent>
 		</Card>

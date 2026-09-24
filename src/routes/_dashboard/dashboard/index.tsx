@@ -29,6 +29,7 @@ import {
 import { getMeQueryOptions } from "@/features/auth";
 import {
 	dashboardOverviewQueryOptions,
+	EnergyUsageChart,
 	energyChartQueryOptions,
 	type HaHealth,
 	last24hWindow,
@@ -38,7 +39,6 @@ import {
 
 import { cn } from "@/lib/utils";
 import { resolveTimezone, useTimezoneStore } from "@/stores/timezone";
-import { EnergyUsageChart } from "./-components/energy-chart";
 import { RelativeTime } from "./-components/relative-time";
 
 const STATUS_CONFIG: Record<
