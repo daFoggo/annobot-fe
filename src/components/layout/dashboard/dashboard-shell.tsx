@@ -31,9 +31,12 @@ const DashboardShellFrame = ({
 	className,
 	children,
 }: DashboardShellFrameProps) => (
-	<SidebarProvider defaultOpen className={cn("h-svh w-full", className)}>
+	<SidebarProvider
+		defaultOpen
+		className={cn("h-svh w-full overflow-hidden", className)}
+	>
 		<MainScrollContainerProvider>
-			<div className="flex h-full w-full flex-col overflow-hidden">
+			<div className="relative flex h-full w-full flex-col overflow-hidden">
 				<a
 					href="#dashboard-main"
 					className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-1.5 focus:text-sm focus:ring-2 focus:ring-ring"
@@ -186,7 +189,7 @@ const DashboardShellContent = ({
 			ref={setRef}
 			tabIndex={-1}
 			className={cn(
-				"flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-background outline-hidden",
+				"relative flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-background outline-hidden",
 				className,
 			)}
 		>

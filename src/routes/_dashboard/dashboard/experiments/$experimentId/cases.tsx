@@ -1,11 +1,9 @@
-import { IconPlayerPlay } from "@tabler/icons-react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { DashboardPage } from "@/components/layout/dashboard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
 	Card,
 	CardContent,
@@ -31,7 +29,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
 import { getMeQueryOptions } from "@/features/auth";
 import {
 	CASES_OVERVIEW_PAGE_SIZE,
@@ -41,7 +38,6 @@ import {
 	durationMinutes,
 	indicatorValue,
 	median,
-	useTriggerDetection,
 } from "@/features/cases";
 import {
 	EnergyUsageChart,
@@ -187,7 +183,6 @@ const ExperimentCasesPage = () => {
 		}),
 	);
 
-	const triggerDetection = useTriggerDetection(experimentId);
 	const cases = useMemo(() => data?.founds ?? [], [data]);
 	const total = data?.total_count ?? 0;
 	const truncated = total > CASES_OVERVIEW_PAGE_SIZE;
@@ -244,22 +239,8 @@ const ExperimentCasesPage = () => {
 	return (
 		<DashboardPage
 			title="Cases"
+			size="full"
 			description="Every case is one device run, bounded by the detection engine from the power trace."
-			actions={
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={triggerDetection.isPending}
-					onClick={() => triggerDetection.mutate(inquiryId)}
-				>
-					{triggerDetection.isPending ? (
-						<Spinner data-icon="inline-start" />
-					) : (
-						<IconPlayerPlay data-icon="inline-start" />
-					)}
-					{activeInquiry ? "Run for this inquiry" : "Run detection"}
-				</Button>
-			}
 		>
 			<div className="flex flex-col gap-4">
 				<Card>
@@ -369,7 +350,7 @@ const ExperimentCasesPage = () => {
 						<CardTitle className="text-sm">Detail</CardTitle>
 						<CardDescription className="text-xs">
 							{truncated
-								? `Showing the ${CASES_OVERVIEW_PAGE_SIZE} most recent of ${total} cases.`
+								? `Showing the ${CASES_OVERVIEW_PAGE_SIZE.toLocaleString()} most recent of ${total.toLocaleString()} cases.`
 								: "Open the info icon to see which thresholds bounded a case."}
 						</CardDescription>
 					</CardHeader>

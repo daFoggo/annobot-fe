@@ -18,7 +18,10 @@ export type {
 	DashboardShellProviderProps,
 	DashboardShellState,
 } from "./dashboard-shell-context";
-export { useDashboardShell } from "./dashboard-shell-context";
+export {
+	useDashboardShell,
+	useOptionalDashboardShell,
+} from "./dashboard-shell-context";
 export { DashboardBreadcrumb } from "./header/dashboard-breadcrumb";
 export type {
 	DashboardContextOption,

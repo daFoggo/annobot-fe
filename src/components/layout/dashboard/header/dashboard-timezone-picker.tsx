@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { timezoneRegions } from "@/lib/timezones";
 import { TZ_BROWSER, TZ_DEFAULT, useTimezoneStore } from "@/stores/timezone";
+import { useOptionalDashboardShell } from "../dashboard-shell-context";
 
 /**
  * Bộ chọn timezone toàn dashboard trên header (cạnh theme toggle). Mặc định
@@ -22,15 +23,33 @@ export const DashboardTimezonePicker = () => {
 	const setChoice = useTimezoneStore((state) => state.setChoice);
 	const regions = timezoneRegions();
 
+	const shell = useOptionalDashboardShell();
+	const userTz = shell?.state.user?.timezone;
+
+	const browserTz = useMemo(() => {
+		try {
+			return typeof window !== "undefined"
+				? Intl.DateTimeFormat().resolvedOptions().timeZone
+				: undefined;
+		} catch {
+			return undefined;
+		}
+	}, []);
+
+	const defaultLabel = userTz ? `${userTz} (Default)` : "Default";
+	const browserLabel = browserTz
+		? `${browserTz} (Browser)`
+		: "Browser timezone";
+
 	// `items` cung cấp cho base-ui cách resolve label của value đang chọn
 	// (SelectValue đọc từ store.items, không phải text của SelectItem).
 	const items = useMemo(
 		() => [
-			{ value: TZ_DEFAULT, label: "Default" },
-			{ value: TZ_BROWSER, label: "Browser timezone" },
+			{ value: TZ_DEFAULT, label: defaultLabel },
+			{ value: TZ_BROWSER, label: browserLabel },
 			...regions.flatMap((region) => region.zones),
 		],
-		[regions],
+		[defaultLabel, browserLabel, regions],
 	);
 
 	return (
@@ -43,7 +62,7 @@ export const DashboardTimezonePicker = () => {
 		>
 			<SelectTrigger
 				size="sm"
-				className="max-w-44 text-xs text-muted-foreground hover:text-foreground"
+				className="max-w-56 text-xs text-muted-foreground hover:text-foreground"
 				aria-label="Timezone"
 			>
 				<IconWorld className="size-4 shrink-0" />
@@ -52,8 +71,8 @@ export const DashboardTimezonePicker = () => {
 			<SelectContent className="w-64 no-scrollbar max-h-[min(calc(--spacing(72)---spacing(9)),calc(var(--available-height)---spacing(9)))]">
 				<SelectGroup>
 					<SelectLabel>General</SelectLabel>
-					<SelectItem value={TZ_DEFAULT}>Default</SelectItem>
-					<SelectItem value={TZ_BROWSER}>Browser timezone</SelectItem>
+					<SelectItem value={TZ_DEFAULT}>{defaultLabel}</SelectItem>
+					<SelectItem value={TZ_BROWSER}>{browserLabel}</SelectItem>
 				</SelectGroup>
 				{regions.map((region) => (
 					<SelectGroup key={region.label}>

@@ -97,7 +97,7 @@ export const CaseEvidenceDialog = ({
 					</Button>
 				}
 			/>
-			<DialogContent>
+			<DialogContent className="sm:max-w-2xl">
 				<DialogHeader>
 					<DialogTitle>Detection evidence</DialogTitle>
 					<DialogDescription>

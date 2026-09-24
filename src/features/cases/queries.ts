@@ -15,7 +15,7 @@ import type { CaseListParams } from "./schemas";
  * cùng một query key — TanStack Query dedupe, cả experiment detail chỉ tốn một
  * request cases thay vì bốn.
  */
-export const CASES_OVERVIEW_PAGE_SIZE = 100;
+export const CASES_OVERVIEW_PAGE_SIZE = 1000;
 
 export const caseKeys = {
 	all: ["cases"] as const,

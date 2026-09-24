@@ -1,9 +1,4 @@
-import {
-	IconArrowRight,
-	IconHelpCircle,
-	IconPlayerPlay,
-	IconSettings,
-} from "@tabler/icons-react";
+import { IconArrowRight, IconHelpCircle } from "@tabler/icons-react";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -37,7 +32,6 @@ import {
 } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
 import { getMeQueryOptions } from "@/features/auth";
 import {
 	CASES_OVERVIEW_PAGE_SIZE,
@@ -45,7 +39,6 @@ import {
 	CaseTimeline,
 	caseListQueryOptions,
 	countByStage,
-	useTriggerDetection,
 } from "@/features/cases";
 import {
 	EnergyUsageChart,
@@ -132,7 +125,6 @@ const ExperimentOverviewPage = () => {
 			page_size: CASES_OVERVIEW_PAGE_SIZE,
 		}),
 	);
-	const triggerDetection = useTriggerDetection(experimentId);
 
 	// Chỉ vẽ chart cho các sensor được gán cho bất kỳ inquiry nào của experiment.
 	const inquirySourceKeys = useMemo(() => {
@@ -191,35 +183,6 @@ const ExperimentOverviewPage = () => {
 				from && to
 					? `Listening period ${from} to ${to}`
 					: "No listening period set for this experiment."
-			}
-			actions={
-				<div className="flex items-center gap-2">
-					<Button
-						variant="outline"
-						size="sm"
-						disabled={triggerDetection.isPending}
-						onClick={() => triggerDetection.mutate(undefined)}
-					>
-						{triggerDetection.isPending ? (
-							<Spinner data-icon="inline-start" />
-						) : (
-							<IconPlayerPlay data-icon="inline-start" />
-						)}
-						Run detection
-					</Button>
-					<Button
-						size="sm"
-						render={
-							<Link
-								to="/dashboard/experiments/$experimentId/setup"
-								params={{ experimentId }}
-							/>
-						}
-					>
-						<IconSettings data-icon="inline-start" />
-						Setup
-					</Button>
-				</div>
 			}
 		>
 			<div className="flex flex-col gap-4">

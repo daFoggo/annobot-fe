@@ -33,9 +33,8 @@ export interface DashboardShellContextValue {
 	actions: DashboardShellActions;
 }
 
-const DashboardShellContext = createContext<DashboardShellContextValue | null>(
-	null,
-);
+export const DashboardShellContext =
+	createContext<DashboardShellContextValue | null>(null);
 
 /**
  * Truy cập state/actions của dashboard shell. UI chỉ biết interface này, không
@@ -50,6 +49,11 @@ export const useDashboardShell = () => {
 	}
 	return value;
 };
+
+/**
+ * Truy cập state/actions của dashboard shell, trả về null nếu nằm ngoài provider.
+ */
+export const useOptionalDashboardShell = () => use(DashboardShellContext);
 
 export interface DashboardShellProviderProps {
 	user: AuthUser;

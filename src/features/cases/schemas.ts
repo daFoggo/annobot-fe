@@ -90,7 +90,7 @@ export const CaseListParamsSchema = z.object({
 	inquiry_id: z.string().optional(),
 	status: z.string().optional(),
 	page: z.number().int().min(1).default(1),
-	page_size: z.number().int().min(1).max(100).default(10),
+	page_size: z.number().int().min(1).max(1000).default(10),
 });
 
 export type CaseListParams = z.infer<typeof CaseListParamsSchema>;

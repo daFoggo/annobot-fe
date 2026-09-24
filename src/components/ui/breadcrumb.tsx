@@ -101,7 +101,7 @@ function BreadcrumbEllipsis({
       role="presentation"
       aria-hidden="true"
       className={cn(
-        "flex size-5 items-center justify-center [&>svg]:size-4",
+        "relative flex size-5 items-center justify-center [&>svg]:size-4",
         className
       )}
       {...props}

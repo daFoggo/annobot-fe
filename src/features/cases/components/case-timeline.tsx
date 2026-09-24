@@ -41,6 +41,39 @@ const LABEL_COL = "w-28 sm:w-36";
 
 type WindowDays = 1 | 3 | 7;
 
+/**
+ * Trả về epoch ms tại thời điểm 00:00:00 của ngày tương ứng trong timeZone chỉ định.
+ */
+const getStartOfDay = (timestamp: number, timeZone: string): number => {
+	try {
+		const fmt = new Intl.DateTimeFormat("en-CA", {
+			timeZone,
+			year: "numeric",
+			month: "2-digit",
+			day: "2-digit",
+		});
+		const [year, month, day] = fmt
+			.format(new Date(timestamp))
+			.split("-")
+			.map(Number);
+		const approxUtc = Date.UTC(year, month - 1, day);
+		const parts = new Intl.DateTimeFormat("en-US", {
+			timeZone,
+			hour: "numeric",
+			minute: "numeric",
+			second: "numeric",
+			hour12: false,
+		}).formatToParts(new Date(approxUtc));
+		const h = Number(parts.find((p) => p.type === "hour")?.value ?? 0) % 24;
+		const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+		const s = Number(parts.find((p) => p.type === "second")?.value ?? 0);
+		return approxUtc - (h * 3600 + m * 60 + s) * 1000;
+	} catch {
+		const d = new Date(timestamp);
+		return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+	}
+};
+
 const clockFmt = (timeZone: string) =>
 	new Intl.DateTimeFormat("en-GB", {
 		timeZone,
@@ -50,6 +83,21 @@ const clockFmt = (timeZone: string) =>
 	});
 
 const dayFmt = (timeZone: string) =>
+	new Intl.DateTimeFormat("en-GB", {
+		timeZone,
+		day: "2-digit",
+		month: "2-digit",
+	});
+
+const fullDateFmt = (timeZone: string) =>
+	new Intl.DateTimeFormat("en-GB", {
+		timeZone,
+		day: "2-digit",
+		month: "2-digit",
+		year: "numeric",
+	});
+
+const shortDateFmt = (timeZone: string) =>
 	new Intl.DateTimeFormat("en-GB", {
 		timeZone,
 		day: "2-digit",
@@ -116,15 +164,26 @@ export const CaseTimeline = ({
 
 		const starts = dated.map((c) => new Date(c.t_start).getTime());
 		const ends = dated.map((c) => new Date(c.t_end as string).getTime());
-		const minStart = Math.min(...starts);
-		const maxEnd = Math.max(...ends);
-		const canPan = maxEnd - minStart > windowMs;
-		const minEnd = minStart + windowMs;
+		const minCaseStart = Math.min(...starts);
+		const maxCaseEnd = Math.max(...ends);
+
+		// Căn chỉnh trục thời gian theo đúng ngày lịch (calendar day) trong timezone:
+		// - earliestDayStart: 00:00:00 của ngày có case sớm nhất
+		// - latestDayEnd: 24:00:00 của ngày có case muộn nhất (tức 00:00:00 ngày hôm sau)
+		const earliestDayStart = getStartOfDay(minCaseStart, timezone);
+		const latestDayEnd = getStartOfDay(maxCaseEnd, timezone) + DAY_MS;
+
+		const totalSpan = latestDayEnd - earliestDayStart;
+		const canPan = totalSpan > windowMs;
+		const minEnd = earliestDayStart + windowMs;
+		const maxEnd = latestDayEnd;
+
+		// Khi không pan hoặc mới load, neo window ở latestDayEnd (hết ngày mới nhất)
 		const end = canPan
 			? Math.min(Math.max(windowEnd ?? maxEnd, minEnd), maxEnd)
 			: maxEnd;
-		const t0 = canPan ? end - windowMs : minStart;
-		const t1 = canPan ? end : maxEnd;
+		const t0 = end - windowMs;
+		const t1 = end;
 		const span = Math.max(t1 - t0, 1);
 		const pct = (ms: number) =>
 			Math.min(Math.max(((ms - t0) / span) * 100, 0), 100);
@@ -144,13 +203,33 @@ export const CaseTimeline = ({
 			else byDevice.set(key, [item]);
 		}
 
-		// Day gridlines: "nice" 6h steps for a 1-day window, else day steps.
+		// Gridlines:
+		// - 1 ngày: chia 4 khoảng 6h (00:00, 06:00, 12:00, 18:00, 24:00).
+		// - Nhiều ngày: mỗi ngày 1 vạch (DD/MM).
 		const step = windowDays === 1 ? DAY_MS / 4 : DAY_MS;
 		const fmt = windowDays === 1 ? timeFmt(timezone) : dayFmt(timezone);
 		const gridlines: { left: number; label: string }[] = [];
-		for (let ms = Math.ceil(t0 / step) * step; ms <= t1; ms += step) {
-			gridlines.push({ left: pct(ms), label: fmt.format(new Date(ms)) });
+
+		if (windowDays === 1) {
+			for (let ms = t0; ms <= t1; ms += step) {
+				const left = pct(ms);
+				const label = ms === t1 ? "24:00" : fmt.format(new Date(ms));
+				gridlines.push({ left, label });
+			}
+		} else {
+			for (let ms = t0; ms <= t1; ms += step) {
+				const left = pct(ms);
+				gridlines.push({
+					left,
+					label: ms === t1 ? "" : fmt.format(new Date(ms)),
+				});
+			}
 		}
+
+		const rangeLabel =
+			windowDays === 1
+				? fullDateFmt(timezone).format(new Date(t0))
+				: `${shortDateFmt(timezone).format(new Date(t0))} – ${fullDateFmt(timezone).format(new Date(t1 - 1000))}`;
 
 		return {
 			minEnd,
@@ -163,6 +242,7 @@ export const CaseTimeline = ({
 			byDevice,
 			devices: [...byDevice.keys()].sort(),
 			gridlines,
+			rangeLabel,
 			total: visible.length,
 		};
 	}, [cases, windowEnd, windowMs, windowDays, timezone]);
@@ -171,7 +251,7 @@ export const CaseTimeline = ({
 		return (
 			<Card className={className}>
 				<CardHeader>
-					<CardTitle className="text-sm">Daily activity</CardTitle>
+					<CardTitle className="text-sm">Extracted cases</CardTitle>
 				</CardHeader>
 				<CardContent>
 					<Skeleton className="h-56 w-full" />
@@ -192,13 +272,21 @@ export const CaseTimeline = ({
 		<Card className={className}>
 			<CardHeader>
 				<div className="flex flex-wrap items-center justify-between gap-2">
-					<CardTitle className="text-sm">Daily activity</CardTitle>
+					<div>
+						<CardTitle className="text-sm">Extracted cases</CardTitle>
+						{model?.rangeLabel ? (
+							<CardDescription className="font-mono text-xs">
+								{model.rangeLabel}
+							</CardDescription>
+						) : null}
+					</div>
 					<div className="flex items-center gap-2">
 						<Tabs
 							value={String(windowDays)}
 							onValueChange={(value) => {
 								if (value === "1" || value === "3" || value === "7") {
 									setWindowDays(Number(value) as WindowDays);
+									setWindowEnd(null);
 								}
 							}}
 						>
@@ -208,9 +296,6 @@ export const CaseTimeline = ({
 								</TabsTrigger>
 								<TabsTrigger value="3" className="text-xs">
 									3 days
-								</TabsTrigger>
-								<TabsTrigger value="7" className="text-xs">
-									7 days
 								</TabsTrigger>
 							</TabsList>
 						</Tabs>
@@ -242,9 +327,6 @@ export const CaseTimeline = ({
 						) : null}
 					</div>
 				</div>
-				<CardDescription className="font-mono text-xs">
-					One row per device · bars are runs · {timezone}
-				</CardDescription>
 			</CardHeader>
 
 			<CardContent
@@ -274,15 +356,27 @@ export const CaseTimeline = ({
 							<div className="flex items-center gap-2">
 								<span className={cn(LABEL_COL, "shrink-0")} />
 								<div className="relative h-4 flex-1">
-									{model.gridlines.map((line) => (
-										<span
-											key={line.label + line.left}
-											className="absolute top-0 font-mono text-[10px] text-muted-foreground tabular-nums"
-											style={{ left: `${line.left}%` }}
-										>
-											{line.label}
-										</span>
-									))}
+									{model.gridlines.map((line) => {
+										if (!line.label) return null;
+										const alignClass =
+											line.left <= 2
+												? "translate-x-0"
+												: line.left >= 98
+													? "-translate-x-full"
+													: "-translate-x-1/2";
+										return (
+											<span
+												key={line.label + line.left}
+												className={cn(
+													"absolute top-0 font-mono text-[10px] text-muted-foreground tabular-nums select-none",
+													alignClass,
+												)}
+												style={{ left: `${line.left}%` }}
+											>
+												{line.label}
+											</span>
+										);
+									})}
 								</div>
 							</div>
 
@@ -303,7 +397,7 @@ export const CaseTimeline = ({
 									>
 										{deviceNames?.[source] ?? deviceLabel(source)}
 									</span>
-									<div className="relative h-full flex-1 rounded-[3px] bg-muted/20">
+									<div className="relative h-full flex-1 overflow-hidden rounded-[3px] bg-muted/20">
 										{model.gridlines.map((line) => (
 											<span
 												key={line.left}
@@ -353,6 +447,7 @@ const RunBar = ({
 }) => {
 	const stage = stageOf(item.status);
 	const width = Math.max(right - left, 0.6);
+	const clampedWidth = Math.min(width, Math.max(100 - left, 0));
 	const overMax = (item.evidence?.flags as string[] | undefined)?.includes(
 		"duration-over-max",
 	);
@@ -360,13 +455,14 @@ const RunBar = ({
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: hover-only tooltip target (no keyboard action)
 		<div
+			data-slot="run-bar"
 			className={cn(
-				"absolute inset-y-1 rounded-[3px] cursor-default transition-[box-shadow] hover:ring-2 hover:ring-ring/60",
+				"absolute inset-y-1 rounded-[3px] cursor-default transition-shadow hover:ring-2 hover:ring-ring/60",
 				overMax && "ring-1 ring-destructive/70",
 			)}
 			style={{
 				left: `${left}%`,
-				width: `${width}%`,
+				width: `${clampedWidth}%`,
 				minWidth: "3px",
 				backgroundColor: stageMeta(stage).color,
 			}}
@@ -393,10 +489,22 @@ const RunTooltip = ({ tip, timezone }: { tip: TipState; timezone: string }) => {
 		"duration-over-max",
 	);
 
+	const flipX =
+		typeof window !== "undefined" && tip.x + 280 > window.innerWidth;
+	const flipY =
+		typeof window !== "undefined" && tip.y + 160 > window.innerHeight;
+
 	return (
 		<div
-			className="pointer-events-none fixed z-50 grid max-w-60 gap-1 rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md"
-			style={{ left: tip.x + 14, top: tip.y + 14 }}
+			className={cn(
+				"pointer-events-none fixed z-50 grid max-w-64 gap-1 rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-md transition-transform duration-75",
+				flipX ? "-translate-x-full" : "translate-x-0",
+				flipY ? "-translate-y-full" : "translate-y-0",
+			)}
+			style={{
+				left: flipX ? Math.max(tip.x - 14, 10) : tip.x + 14,
+				top: flipY ? Math.max(tip.y - 14, 10) : tip.y + 14,
+			}}
 		>
 			<span className="font-medium text-popover-foreground">{device}</span>
 			<span className="font-mono text-popover-foreground tabular-nums">
